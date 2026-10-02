@@ -8,7 +8,7 @@
 - 七种棋子的移动和吃子限制，包括蹩马腿、塞象眼、炮架、过河和九宫。
 - 禁止吃己方棋子、将帅照面、自陷将军；被将军时必须应将。
 - 选择棋子后显示合法落点，提供将军提示、棋盘翻转、吃子和走棋记录。
-- 棋子优先使用系统的华文行楷，未安装时回退到楷体；黑方使用“砲”。己方可操作棋子悬停时显示红色微光，选中后略微放大并抬起，落子前可换选其他棋子。
+- 棋子使用随程序打包的行书小字库，黑方“砲”与其他棋子风格一致，按实际笔画范围居中。己方可操作棋子悬停时显示红色微光，选中后略微放大并抬起，落子前可换选其他棋子。
 - 同机双人可悔棋；联机支持建房、加房、刷新恢复席位和双方同意后重新开局。
 
 **暂不自动裁定胜负**：不检测将死、困毙、和棋、长将长捉、自然限着。不提供 AI、计时和存档；双方自行确认对局结束后重新开局。
@@ -47,7 +47,7 @@ npm run desktop
 npm run dist:win
 ```
 
-输出为 `dist/Chinese-Chess-Demo-0.1.1-x64.exe`。复制此文件到 Windows 电脑后即可运行，无需安装 Node.js。首次构建会下载 Electron 和打包工具。
+输出为 `dist/Chinese-Chess-Demo-0.1.2-x64.exe`。复制此文件到 Windows 电脑后即可运行，无需安装 Node.js。首次构建会下载 Electron 和打包工具。
 
 EXE 内置服务器，默认监听 3000 端口；端口被占用时会自动使用其他空闲端口。实际可分享的地址在界面“本机可分享的局域网地址”中查看。
 
@@ -86,4 +86,4 @@ tests/               规则与联机测试
 docs/RULES.md        基本规则、来源与首版范围
 ```
 
-规则依据已查阅的 [Xiangqi.com 棋子规则](https://www.xiangqi.com/help/pieces-and-moves)与[棋盘及初始布局](https://www.xiangqi.com/help/board-and-set-up)，实现范围详见 [规则说明](docs/RULES.md)。本项目尚未指定开源许可证。
+规则依据已查阅的 [Xiangqi.com 棋子规则](https://www.xiangqi.com/help/pieces-and-moves)与[棋盘及初始布局](https://www.xiangqi.com/help/board-and-set-up)，实现范围详见 [规则说明](docs/RULES.md)。字体衍生自 OFL 1.1 授权的 Zhi Mang Xing，来源、补字与生成方式见 [字体说明](web/fonts/README.md)。本项目源码尚未指定开源许可证。

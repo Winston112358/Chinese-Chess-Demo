@@ -10,6 +10,7 @@ const assets = new Map([
   ['/app.js', ['../../web/app.js', 'text/javascript; charset=utf-8']],
   ['/board.js', ['../../web/board.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['../../web/style.css', 'text/css; charset=utf-8']],
+  ['/fonts/xiangqi-xingkai.woff2', ['../../web/fonts/xiangqi-xingkai.woff2', 'font/woff2']],
   ['/shared/rules.js', ['../shared/rules.js', 'text/javascript; charset=utf-8']],
 ]);
 
