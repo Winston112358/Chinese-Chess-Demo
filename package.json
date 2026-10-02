@@ -3,11 +3,39 @@
   "version": "0.1.0",
   "description": "中国象棋：网页、Windows 客户端与局域网对弈",
   "private": true,
+  "author": "Winston112358",
   "license": "UNLICENSED",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "main": "src/desktop/main.js",
+  "scripts": {
+    "start": "node src/server/start.js",
+    "desktop": "electron .",
+    "test": "node --test",
+    "dist:win": "electron-builder --win portable --x64"
+  },
+  "engines": {
+    "node": ">=22.12"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/Winston112358/Chinese-Chess-Demo.git"
+  },
+  "dependencies": {
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "io.github.winston112358.chinesechess",
+    "productName": "Chinese Chess Demo",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "web/**/*", "package.json"],
+    "win": {
+      "target": "portable",
+      "signAndEditExecutable": false,
+      "artifactName": "Chinese-Chess-Demo-${version}-${arch}.${ext}"
+    }
   }
 }
