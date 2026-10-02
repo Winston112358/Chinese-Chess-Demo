@@ -28,6 +28,8 @@ let aiError = '';
 let aiInfo = null;
 let aiInfoLoading = false;
 const aiSearch = createAiSearch();
+const assistSearch = createAiSearch();
+let assistJob = null;
 const storageKey = 'xiangqi-last-room';
 const ACTION_NAMES = { undo: '单步悔棋', draw: '求和', resign: '认输', restart: '重新开局' };
 
@@ -170,6 +172,10 @@ function dangerPoints(view) {
 }
 
 function render() {
+  if (assistJob && !currentAssist(assistJob)) {
+    cancelAssist();
+    if ($('message').textContent.startsWith('皮卡鱼正在分析')) notify('对局状态已变化，已取消 AI 辅助');
+  }
   const connected = socket?.readyState === WebSocket.OPEN;
   const bothOnline = room?.players.red && room?.players.black;
   const ready = !room || (room.clock?.started && connected);
@@ -185,6 +191,7 @@ function render() {
   if (!sandbox && aiHumanSide && !game.result && game.turn !== aiHumanSide) {
     $('turn').textContent += aiThinking ? ' · 皮卡鱼思考中…' : ' · 等待电脑走棋';
   }
+  if (assistJob) $('turn').textContent += ' · AI 辅助分析中…';
   const undoable = !game.result || ['checkmate', 'stalemate', 'general-captured'].includes(game.result.reason);
   $('undo').textContent = room ? '请求单步悔棋' : aiHumanSide ? '撤回我的上一步' : '悔棋一步';
   $('undo').disabled = !(aiHumanSide ? aiUndoCount(game, aiHumanSide) : game.history.length) || !undoable || connecting || (room && !canNegotiate);
@@ -291,6 +298,7 @@ function clickPoint(point) {
   if (!selected) return notify('请先选择当前回合的棋子', true);
   const result = room ? validateMove(game, selected, point) : applyMove(game, selected, point);
   if (!result.ok) return;
+  cancelAssist();
   if (room) {
     movePending = true;
     send({ type: 'move', from: selected, to: point, revision: room.revision });
@@ -306,6 +314,11 @@ function clickPoint(point) {
 }
 
 function renderAi() {
+  const assistReason = assistUnavailableReason();
+  $('ai-assist').hidden = Boolean(aiHumanSide);
+  $('ai-assist').disabled = !assistJob && Boolean(assistReason);
+  $('ai-assist').textContent = assistJob ? '取消 AI 辅助' : 'AI 帮我走一步';
+  $('ai-assist').title = assistJob ? '取消本次分析，继续自行走棋' : assistReason || '分析当前局面并直接走一步；联机分析期间继续计时';
   $('ai-start').disabled = connecting || aiInfoLoading || aiInfo?.available === false;
   $('ai-start').textContent = aiHumanSide ? '按所选执子重新开局' : '开始人机对战';
   $('ai-retry').hidden = !aiHumanSide || !aiError || Boolean(game.result);
@@ -323,6 +336,72 @@ function renderAi() {
         : aiInfo?.error || '正在检查皮卡鱼…';
 }
 
+function assistUnavailableReason() {
+  if (aiHumanSide) return 'AI 辅助用于同机双人或局域网对局';
+  if (sandbox) return '请先退出沙盘，再使用 AI 辅助走真实棋局';
+  if (game.result) return '对局已结束';
+  if (connecting || movePending) return '请等待服务器回应';
+  if (actionSending || pendingVote()) return '请先完成投票，再使用 AI 辅助';
+  if (room && socket?.readyState !== WebSocket.OPEN) return '请先恢复房间连接';
+  if (room && !room.clock?.started) return '等待好友加入后才能走棋';
+  if (room && game.turn !== side) return '轮到你走棋时才能使用 AI 辅助';
+  if (aiInfoLoading || !aiInfo) return '正在检查皮卡鱼…';
+  if (!aiInfo.available) return aiInfo.error || '皮卡鱼不可用，请在右侧重新检查';
+  return '';
+}
+
+function currentAssist(job) {
+  if (assistJob !== job || assistUnavailableReason()) return false;
+  // Room state messages rebuild game objects even when only a player reconnects.
+  return room
+    ? job.socket === socket && job.code === room.code && job.revision === room.revision && job.side === side
+    : job.code === null && job.position === game;
+}
+
+function cancelAssist() {
+  assistSearch.cancel();
+  assistJob = null;
+}
+
+async function assistMove() {
+  if (assistJob) {
+    cancelAssist();
+    notify('已取消 AI 辅助，可以自行走棋');
+    render();
+    return;
+  }
+  const reason = assistUnavailableReason();
+  if (reason) return notify(reason, true);
+  const job = { position: game, code: room?.code ?? null, revision: room?.revision, socket, side };
+  assistJob = job;
+  selected = null;
+  notify(`皮卡鱼正在分析当前局面，完成后自动走一步${room ? '；计时继续' : ''}。可点击按钮取消。`);
+  render();
+  try {
+    const move = await assistSearch.search(job.position);
+    if (!move || !currentAssist(job)) return;
+    const result = room ? validateMove(game, move.from, move.to) : applyMove(game, move.from, move.to);
+    if (!result.ok) throw new Error('皮卡鱼返回的着法不符合本局规则，请重试');
+    assistJob = null;
+    selected = null;
+    if (room) {
+      movePending = true;
+      send({ type: 'move', from: move.from, to: move.to, revision: job.revision });
+      notify('AI 已选好着法，正在提交落子…');
+    } else {
+      game = localGame = result.game;
+      notify(game.result ? resultDescription(game.result) : 'AI 已代走一步，轮到对方');
+    }
+  } catch (error) {
+    if (!currentAssist(job)) return;
+    notify(`AI 辅助失败：${error.message || '无法连接皮卡鱼，请重试'}`, true);
+  } finally {
+    // A cancelled request must not clear a newer search or its status message.
+    if (assistJob === job) assistJob = null;
+    render();
+  }
+}
+
 async function checkAi() {
   aiInfoLoading = true;
   renderAi();
@@ -338,6 +417,7 @@ async function checkAi() {
 }
 
 function cancelAi() {
+  cancelAssist();
   aiSearch.cancel();
   aiThinking = false;
   aiError = '';
@@ -399,6 +479,7 @@ $('ai-start').addEventListener('click', () => {
 });
 $('ai-retry').addEventListener('click', () => { notify('正在重试电脑走棋…'); void playAiMove(); });
 $('ai-refresh').addEventListener('click', () => { void checkAi(); });
+$('ai-assist').addEventListener('click', () => { void assistMove(); });
 
 function send(message) {
   if (socket?.readyState !== WebSocket.OPEN) { movePending = false; notify('连接已断开，请恢复房间', true); return; }

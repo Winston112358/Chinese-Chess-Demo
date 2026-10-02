@@ -46,6 +46,7 @@
       <section class="game-area" aria-label="象棋对局">
         <div class="board-tools">
           <div class="sandbox-controls toolbar">
+            <button id="ai-assist" type="button" disabled>AI 帮我走一步</button>
             <button id="sandbox-toggle" aria-pressed="false">进入沙盘</button>
             <button id="sandbox-undo" hidden>沙盘撤销一步</button>
           </div>
@@ -160,6 +161,7 @@
           <p>已限制棋子的走法、吃子、将帅照面和自陷将军，并提示将军。</p>
           <p>自动裁定将死、困毙、将帅被吃和联机超时，结束后停止落子。局域网双方同意后可重新开局，沿用本房间时限。</p>
           <p>沙盘仅在本机推演，真实对局不停钟；真实棋盘更新后同步沙盘基线。联机悔棋、求和和认输须对手投票同意。</p>
+          <p>双人对局中可点击“AI 帮我走一步”，让皮卡鱼分析当前局面并直接落子，每次只走一步。联机仅限自己的回合，分析期间照常计时；可取消分析或自行落子。</p>
           <p>人机模式接入皮卡鱼，可选先后手，认输立即生效。暂不提供自动和棋或长将长捉裁定。同机双人与人机对战不计时。</p>
         </section>
       </aside>
