@@ -94,6 +94,11 @@ main > .toolbar button { padding: 6px 11px; font-size: 14px; line-height: 1.4; w
 .point.legal.piece { outline: 3px solid var(--legal-mark, #23713b); outline-offset: 2px; }
 .panel { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 14px; margin-bottom: 16px; }
 .network-panel { border-color: #c6d1db; }
+.ai-panel { border-color: #b7c9bb; }
+#ai-start { width: 100%; margin-top: 10px; }
+#ai-status { min-height: 22px; overflow-wrap: anywhere; }
+#ai-status.error { color: #a32020; }
+.ai-panel .hint { color: #666; font-size: 12px; }
 .panel p { margin: 10px 0; font-size: 14px; }
 .panel label { display: block; margin-bottom: 6px; font-size: 14px; }
 .room-controls { display: grid; gap: 8px; margin-top: 10px; }

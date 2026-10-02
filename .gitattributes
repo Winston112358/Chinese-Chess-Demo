@@ -3,3 +3,8 @@
 *.ico binary
 *.exe binary
 *.woff2 binary
+# Preserve official license/attribution bytes used by the resource checksums.
+vendor/pikafish/Copying.txt -text
+vendor/pikafish/NNUE-License.md -text
+vendor/pikafish/AUTHORS -text
+vendor/pikafish/UPSTREAM-README.md -text

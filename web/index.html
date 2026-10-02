@@ -16,8 +16,8 @@
   <main>
     <header class="game-header">
       <div class="game-title">
-        <h1>中国象棋 <small>试玩版 v0.3.2</small></h1>
-        <p>同机双人或局域网对弈 · 红方先行</p>
+        <h1>中国象棋 <small>试玩版 v0.4.0</small></h1>
+        <p>同机双人 · 皮卡鱼人机对战 · 局域网对弈</p>
       </div>
       <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
         <div id="clock-red" class="clock red">
@@ -61,6 +61,19 @@
         <div id="captures-bottom" class="capture-row" hidden></div>
       </section>
       <aside>
+        <section class="panel ai-panel" aria-labelledby="ai-heading">
+          <h2 id="ai-heading">人机对战 · 皮卡鱼</h2>
+          <label for="ai-side">选择你的执子</label>
+          <select id="ai-side">
+            <option value="red">我执红方 · 先手</option>
+            <option value="black">我执黑方 · 后手</option>
+          </select>
+          <button id="ai-start" type="button" disabled>开始人机对战</button>
+          <p id="ai-status" role="status" aria-live="polite">正在检查皮卡鱼…</p>
+          <button id="ai-retry" type="button" hidden>重试电脑走棋</button>
+          <button id="ai-refresh" type="button" hidden>重新检查皮卡鱼</button>
+          <p class="hint">固定强度，不计时；每步约思考 1 秒。开启后进入全新人机棋局；悔棋会同时撤回电脑的应手。</p>
+        </section>
         <section class="panel network-panel">
           <h2>局域网联机</h2>
           <div id="clock-details" class="clock-details" hidden>
@@ -143,11 +156,11 @@
           <ol id="history" aria-label="走棋记录"></ol>
         </section>
         <section class="panel">
-          <h2>首版说明</h2>
+          <h2>对局说明</h2>
           <p>已限制棋子的走法、吃子、将帅照面和自陷将军，并提示将军。</p>
           <p>自动裁定将死、困毙、将帅被吃和联机超时，结束后停止落子。局域网双方同意后可重新开局，沿用本房间时限。</p>
           <p>沙盘仅在本机推演，真实对局不停钟；真实棋盘更新后同步沙盘基线。联机悔棋、求和和认输须对手投票同意。</p>
-          <p>暂不提供 AI、自动和棋或长将长捉裁定。同机双人不计时。</p>
+          <p>人机模式接入皮卡鱼，可选先后手，认输立即生效。暂不提供自动和棋或长将长捉裁定。同机双人与人机对战不计时。</p>
         </section>
       </aside>
     </div>

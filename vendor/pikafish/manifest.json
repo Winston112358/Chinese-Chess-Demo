@@ -1,0 +1,57 @@
+{
+  "name": "Pikafish",
+  "release": "Pikafish-2026-09-06",
+  "platform": "win32-x64",
+  "releaseUrl": "https://github.com/official-pikafish/Pikafish/releases/tag/Pikafish-2026-09-06",
+  "sourceCommit": "4c17cee11f888ae1d48a9494f2e2239f019f0a1f",
+  "archive": {
+    "name": "Pikafish.2026-09-06.7z",
+    "url": "https://github.com/official-pikafish/Pikafish/releases/download/Pikafish-2026-09-06/Pikafish.2026-09-06.7z",
+    "bytes": 53603424,
+    "sha256": "41952bbfe2520faceb5902c69e6ab4845cc999841d2b49a95cc1be7867a25e5b"
+  },
+  "source": {
+    "name": "Pikafish-source-Pikafish-2026-09-06.zip",
+    "url": "https://github.com/official-pikafish/Pikafish/archive/refs/tags/Pikafish-2026-09-06.zip",
+    "bytes": 559168,
+    "sha256": "0dd14eb1d1fc1144c7a98ec824461eaf2d451a16013046652c60a2e95972ce23"
+  },
+  "files": [
+    {
+      "archivePath": "Pikafish-Windows-x86-64-universal.exe",
+      "path": "pikafish.exe",
+      "bytes": 6944256,
+      "sha256": "0d57d64c212e78f96cba9e5e4f140d8872f8faa42ea631a27ab6c5db08509da3"
+    },
+    {
+      "archivePath": "pikafish.nnue",
+      "path": "pikafish.nnue",
+      "bytes": 50706378,
+      "sha256": "7d13d73569a9b571ba0eb20cf1596247bc2a42738967e61afef6482b231e900e"
+    },
+    {
+      "archivePath": "Copying.txt",
+      "path": "Copying.txt",
+      "bytes": 35149,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "archivePath": "NNUE-License.md",
+      "path": "NNUE-License.md",
+      "bytes": 899,
+      "sha256": "7f3320aa61ceefecec1d5cd158d6d1d2a8adde93728e83a79448df50903c367b"
+    },
+    {
+      "archivePath": "AUTHORS",
+      "path": "AUTHORS",
+      "bytes": 686,
+      "sha256": "0358f129f8f5c604c032916b8c315fec5bc3151ebdae51456b4fad27895abfbe"
+    },
+    {
+      "archivePath": "README.md",
+      "path": "UPSTREAM-README.md",
+      "bytes": 7805,
+      "sha256": "34b7b31204b5d2d1a69bad317cbc7a323b3558594075ff04e49a2ae7246a764a"
+    }
+  ]
+}

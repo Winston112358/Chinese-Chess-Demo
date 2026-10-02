@@ -1,7 +1,9 @@
 import { app, BrowserWindow, dialog } from 'electron';
 import { startServer } from '../server/server.js';
+import { join } from 'node:path';
 
 let server;
+let quitting = false;
 if (!app.requestSingleInstanceLock()) app.quit();
 else {
   app.on('second-instance', () => {
@@ -11,10 +13,12 @@ else {
   });
   app.whenReady().then(async () => {
     try {
-      try { server = await startServer(); }
+      const engineOptions = app.isPackaged
+        ? { executablePath: join(process.resourcesPath, 'pikafish', 'pikafish.exe') } : undefined;
+      try { server = await startServer({ engineOptions }); }
       catch (error) {
         if (error.code !== 'EADDRINUSE') throw error;
-        server = await startServer({ port: 0 });
+        server = await startServer({ port: 0, engineOptions });
       }
       const window = new BrowserWindow({
         width: 1100, height: 880, minWidth: 580, minHeight: 680,
@@ -33,5 +37,10 @@ else {
     }
   });
   app.on('window-all-closed', () => app.quit());
-  app.on('before-quit', () => { if (server) void server.close(); });
+  app.on('before-quit', (event) => {
+    if (!server || quitting) return;
+    event.preventDefault();
+    quitting = true;
+    void server.close().then(() => app.quit(), () => app.quit());
+  });
 }

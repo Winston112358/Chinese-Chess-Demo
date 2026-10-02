@@ -3,6 +3,7 @@ import { renderBoard } from '/board.js';
 import { createSandbox, rebaseSandbox, sandboxApplyMove, sandboxUndo } from '/shared/sandbox.js';
 import { dangerousPieces } from '/shared/analysis.js';
 import { renderCaptured } from '/game-tools.js';
+import { aiUndoCount, createAiSearch } from '/ai-game.js';
 
 const $ = (id) => document.getElementById(id);
 let localGame = createInitialGame();
@@ -21,6 +22,12 @@ let actionSending = false;
 let dangerCache = { board: null, side: null, points: [] };
 let displayedResultKey = '';
 let resultReturnFocus = null;
+let aiHumanSide = null;
+let aiThinking = false;
+let aiError = '';
+let aiInfo = null;
+let aiInfoLoading = false;
+const aiSearch = createAiSearch();
 const storageKey = 'xiangqi-last-room';
 const ACTION_NAMES = { undo: '单步悔棋', draw: '求和', resign: '认输', restart: '重新开局' };
 
@@ -40,7 +47,7 @@ function resultDescription(result) {
     stalemate: `${SIDE_NAMES[result.loser]}无合法着法（困毙）`,
     'general-captured': `${SIDE_NAMES[result.loser]}将帅被吃`,
     timeout: `${SIDE_NAMES[result.loser]}超时`,
-    resignation: `${SIDE_NAMES[result.loser]}认输（双方已同意）`,
+    resignation: `${SIDE_NAMES[result.loser]}认输${room ? '（双方已同意）' : ''}`,
   };
   return `${SIDE_NAMES[result.winner]}获胜：${reasons[result.reason] || '对局结束'}。`;
 }
@@ -81,7 +88,7 @@ function closeResult() {
 
 function renderResult() {
   const result = game.result;
-  const key = result ? `${room ? `room:${room.code}` : 'local'}:${resultKey(result)}` : '';
+  const key = result ? `${room ? `room:${room.code}` : aiHumanSide ? 'ai' : 'local'}:${resultKey(result)}` : '';
   $('result-summary').hidden = !result;
   $('result-summary').textContent = result ? resultDescription(result) : '';
   $('result-title').textContent = result ? (result.reason === 'draw' ? '和棋' : `${SIDE_NAMES[result.winner]}获胜`) : '';
@@ -155,7 +162,7 @@ function renderVote() {
 
 function dangerPoints(view) {
   if (!$('danger-toggle').checked || view.result) return [];
-  const color = side || view.turn;
+  const color = side || aiHumanSide || view.turn;
   if (dangerCache.board !== view.board || dangerCache.side !== color) {
     dangerCache = { board: view.board, side: color, points: dangerousPieces(view, color) };
   }
@@ -169,16 +176,21 @@ function render() {
   const view = sandbox?.game || game;
   const request = pendingVote();
   const canNegotiate = Boolean(room && connected && bothOnline && room.clock?.started && !connecting && !actionSending && !request);
-  $('mode').textContent = room ? `局域网 · 你是${SIDE_NAMES[side]}` : '同机双人';
+  $('mode').textContent = room ? `局域网 · 你是${SIDE_NAMES[side]}` : aiHumanSide ? `人机 · 你是${SIDE_NAMES[aiHumanSide]}` : '同机双人';
   $('turn').textContent = sandbox
     ? `沙盘 · ${view.result ? '推演结束' : `${SIDE_NAMES[view.turn]}走棋`} · 已推演 ${view.history.length} 步`
     : game.result ? `对局结束 · 已走 ${game.history.length} 步` : `${SIDE_NAMES[game.turn]}走棋 · 已走 ${game.history.length} 步${isInCheck(game.board, game.turn) ? ' · 将军！请应将' : ''}`;
   $('turn').className = `turn ${view.result?.winner || view.turn}`;
   if (!sandbox && request && !game.result) $('turn').textContent += ' · 等待投票';
+  if (!sandbox && aiHumanSide && !game.result && game.turn !== aiHumanSide) {
+    $('turn').textContent += aiThinking ? ' · 皮卡鱼思考中…' : ' · 等待电脑走棋';
+  }
   const undoable = !game.result || ['checkmate', 'stalemate', 'general-captured'].includes(game.result.reason);
-  $('undo').textContent = room ? '请求单步悔棋' : '悔棋一步';
-  $('undo').disabled = !game.history.length || !undoable || connecting || (room && !canNegotiate);
-  $('draw').disabled = $('resign').disabled = !canNegotiate || Boolean(game.result);
+  $('undo').textContent = room ? '请求单步悔棋' : aiHumanSide ? '撤回我的上一步' : '悔棋一步';
+  $('undo').disabled = !(aiHumanSide ? aiUndoCount(game, aiHumanSide) : game.history.length) || !undoable || connecting || (room && !canNegotiate);
+  $('draw').disabled = !canNegotiate || Boolean(game.result);
+  $('draw').hidden = Boolean(aiHumanSide);
+  $('resign').disabled = (aiHumanSide ? connecting : !canNegotiate) || Boolean(game.result);
   $('restart').disabled = connecting || (room && (!connected || !bothOnline || actionSending || Boolean(request)));
   $('sandbox-toggle').textContent = sandbox ? '退出沙盘' : '进入沙盘';
   $('sandbox-toggle').setAttribute('aria-pressed', String(Boolean(sandbox)));
@@ -190,11 +202,12 @@ function render() {
   if (sandbox) {
     const real = game.result ? resultDescription(game.result) : request
       ? `真实棋局：等待投票，${SIDE_NAMES[game.turn]}计时中。`
-      : `真实棋局：${SIDE_NAMES[game.turn]}走棋，计时继续。`;
+      : aiHumanSide ? `真实棋局：${game.turn === aiHumanSide ? '轮到你走棋' : aiThinking ? '皮卡鱼思考中' : '等待电脑走棋'}。`
+        : room ? `真实棋局：${SIDE_NAMES[game.turn]}走棋，计时继续。` : `真实棋局：${SIDE_NAMES[game.turn]}走棋。`;
     const analysis = view.result ? `推演结果：${resultDescription(view.result)}` : `${SIDE_NAMES[view.turn]}走棋${isInCheck(view.board, view.turn) ? ' · 将军' : ''}。`;
     $('sandbox-banner').textContent = `沙盘模式 · ${analysis} ${real}`;
   }
-  $('local').hidden = !room && !connecting;
+  $('local').hidden = !room && !connecting && !aiHumanSide;
   $('create').disabled = Boolean(room) || connecting;
   $('join').disabled = Boolean(room) || connecting;
   $('server').disabled = Boolean(room) || connecting;
@@ -216,9 +229,10 @@ function render() {
     $('resume').hidden = connected;
   }
   renderClocks();
+  renderAi();
   renderBoard($('board'), {
     game: view, selected, flipped,
-    canSelect: !view.result && (sandbox ? true : ready && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side)),
+    canSelect: !view.result && (sandbox ? true : ready && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side) && (!aiHumanSide || game.turn === aiHumanSide)),
     moves: selected ? legalMoves(view, selected) : [],
     danger: dangerPoints(view),
     onClick: clickPoint,
@@ -265,6 +279,7 @@ function clickPoint(point) {
   if (room && socket?.readyState !== WebSocket.OPEN) return notify('连接已断开，请恢复房间后落子；计时继续', true);
   if (room && !room.clock?.started) return notify('等待好友首次连接后开钟落子', true);
   if (room && game.turn !== side) return notify('现在是对手的回合', true);
+  if (aiHumanSide && game.turn !== aiHumanSide) return notify(aiThinking ? '皮卡鱼正在思考，你可以进入沙盘推演' : '等待电脑走棋，请点击“重试电脑走棋”', Boolean(aiError));
   const piece = pieceAt(game.board, point);
   if (piece?.side === game.turn) {
     selected = selected?.x === point.x && selected?.y === point.y ? null : point;
@@ -280,12 +295,109 @@ function clickPoint(point) {
     send({ type: 'move', from: selected, to: point, revision: room.revision });
     render();
   } else {
-    game = localGame = result.game;
+    game = result.game;
+    if (!aiHumanSide) localGame = game;
     selected = null;
     notify(game.result ? resultDescription(game.result) : '落子成功，轮到对方');
     render();
+    if (aiHumanSide) void playAiMove();
   }
 }
+
+function renderAi() {
+  $('ai-start').disabled = connecting || aiInfoLoading || aiInfo?.available === false;
+  $('ai-start').textContent = aiHumanSide ? '按所选执子重新开局' : '开始人机对战';
+  $('ai-retry').hidden = !aiHumanSide || !aiError || Boolean(game.result);
+  $('ai-retry').disabled = aiThinking;
+  $('ai-refresh').hidden = aiInfo?.available !== false;
+  $('ai-refresh').disabled = aiInfoLoading;
+  $('ai-status').classList.toggle('error', Boolean(aiError || aiInfo?.available === false));
+  $('ai-status').textContent = aiHumanSide
+    ? game.result ? `本局已结束。${resultDescription(game.result)}`
+      : aiError ? `电脑走棋失败：${aiError}`
+        : aiThinking ? '皮卡鱼正在思考…首次走棋可能稍慢。'
+          : `你执${SIDE_NAMES[aiHumanSide]}，轮到你走棋。`
+    : aiInfoLoading ? '正在检查皮卡鱼…'
+      : aiInfo?.available ? '皮卡鱼已就绪 · 离线引擎'
+        : aiInfo?.error || '正在检查皮卡鱼…';
+}
+
+async function checkAi() {
+  aiInfoLoading = true;
+  renderAi();
+  try {
+    const response = await fetch('/api/ai/info', { signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) throw new Error('无法检查皮卡鱼，请重新检查');
+    aiInfo = await response.json();
+  } catch (error) {
+    aiInfo = { available: false, error: error.name === 'TimeoutError' ? '检查皮卡鱼超时，请重新检查' : error.message };
+  }
+  aiInfoLoading = false;
+  renderAi();
+}
+
+function cancelAi() {
+  aiSearch.cancel();
+  aiThinking = false;
+  aiError = '';
+}
+
+async function playAiMove() {
+  if (!aiHumanSide || room || connecting || game.result || game.turn === aiHumanSide || aiThinking) return;
+  const position = game;
+  const player = aiHumanSide;
+  aiThinking = true;
+  aiError = '';
+  render();
+  try {
+    const move = await aiSearch.search(position);
+    if (!move || game !== position || aiHumanSide !== player || room || connecting) return;
+    const result = applyMove(game, move.from, move.to);
+    if (!result.ok) throw new Error('皮卡鱼返回的着法不符合本局规则，请重试');
+    game = result.game;
+    aiThinking = false;
+    selected = null;
+    const hadSandbox = Boolean(sandbox);
+    if (sandbox) sandbox = game.result ? null : createSandbox(game, null);
+    notify(game.result ? resultDescription(game.result) : hadSandbox ? '皮卡鱼已落子，沙盘已从最新棋局重新开始' : '皮卡鱼已落子，轮到你');
+    render();
+  } catch (error) {
+    if (game !== position || aiHumanSide !== player || room || connecting) return;
+    aiThinking = false;
+    aiError = error.message || '无法连接皮卡鱼，请重试';
+    notify(`电脑走棋失败：${aiError}`, true);
+    render();
+  }
+}
+
+// Stop callbacks from the former online seat before changing local modes.
+function disconnectRoom() {
+  const old = socket;
+  socket = null;
+  old?.close();
+  clearTimeout(connectionTimer);
+  room = null;
+  side = null;
+  connecting = false;
+  movePending = false;
+  actionSending = false;
+  sandbox = null;
+  selected = null;
+}
+
+$('ai-start').addEventListener('click', () => {
+  cancelAi();
+  disconnectRoom();
+  aiHumanSide = $('ai-side').value === 'black' ? 'black' : 'red';
+  game = createInitialGame();
+  flipped = aiHumanSide === 'black';
+  $('network-status').textContent = '人机对战已开始，上次联机房间可以恢复。';
+  notify(`人机对战开始，你执${SIDE_NAMES[aiHumanSide]}，红方先行`);
+  render();
+  void playAiMove();
+});
+$('ai-retry').addEventListener('click', () => { notify('正在重试电脑走棋…'); void playAiMove(); });
+$('ai-refresh').addEventListener('click', () => { void checkAi(); });
 
 function send(message) {
   if (socket?.readyState !== WebSocket.OPEN) { movePending = false; notify('连接已断开，请恢复房间', true); return; }
@@ -301,6 +413,8 @@ function serverBase(value) {
 function connect(action, address = $('server').value.trim()) {
   let base;
   try { base = serverBase(address); } catch (error) { notify(error.message, true); return; }
+  cancelAi();
+  if (aiHumanSide) { aiHumanSide = null; game = localGame; flipped = false; }
   if (socket) socket.close();
   clearTimeout(connectionTimer);
   connecting = true;
@@ -398,14 +512,28 @@ function connect(action, address = $('server').value.trim()) {
 
 $('restart').addEventListener('click', () => {
   if (room) { actionSending = true; if (!sandbox) selected = null; send({ type: 'restart-request' }); render(); return; }
-  game = localGame = createInitialGame();
+  cancelAi();
+  game = createInitialGame();
+  if (!aiHumanSide) localGame = game;
   sandbox = null;
   selected = null;
   notify('新对局开始，红方先行');
   render();
+  if (aiHumanSide) void playAiMove();
 });
 $('undo').addEventListener('click', () => {
   if (room) return requestAction('undo');
+  if (aiHumanSide) {
+    const count = aiUndoCount(game, aiHumanSide);
+    if (!count) return;
+    cancelAi();
+    for (let i = 0; i < count; i++) game = undoMove(game);
+    if (sandbox) sandbox = createSandbox(game, null);
+    selected = null;
+    notify('已撤回你的上一步，轮到你重新走棋');
+    render();
+    return;
+  }
   game = localGame = undoMove(localGame);
   if (sandbox) sandbox = createSandbox(game, null);
   selected = null;
@@ -413,7 +541,16 @@ $('undo').addEventListener('click', () => {
   render();
 });
 $('draw').addEventListener('click', () => requestAction('draw'));
-$('resign').addEventListener('click', () => requestAction('resign'));
+$('resign').addEventListener('click', () => {
+  if (!aiHumanSide) return requestAction('resign');
+  if (game.result) return;
+  cancelAi();
+  game = { ...game, result: { winner: aiHumanSide === 'red' ? 'black' : 'red', loser: aiHumanSide, reason: 'resignation' } };
+  sandbox = null;
+  selected = null;
+  notify(resultDescription(game.result));
+  render();
+});
 function requestAction(action) {
   if (!room) return;
   actionSending = true;
@@ -447,16 +584,9 @@ new MutationObserver(() => {
 }).observe($('board'), { attributes: true, attributeFilter: ['data-skin'] });
 $('flip').addEventListener('click', () => { flipped = !flipped; render(); });
 $('local').addEventListener('click', () => {
-  const old = socket;
-  socket = null;
-  old?.close();
-  clearTimeout(connectionTimer);
-  room = null;
-  side = null;
-  connecting = false;
-  movePending = false;
-  actionSending = false;
-  sandbox = null;
+  cancelAi();
+  disconnectRoom();
+  aiHumanSide = null;
   game = localGame;
   selected = null;
   flipped = false;
@@ -573,6 +703,7 @@ fetch('/api/server-info').then((response) => response.json()).then(({ addresses 
   if (!addresses.length) $('addresses').textContent = '未找到可用的局域网地址';
 }).catch(() => { $('addresses').textContent = '无法读取本机地址'; });
 render();
+void checkAi();
 setInterval(renderClocks, 100);
 const saved = savedSeat();
 if (saved && saved.base === location.origin) connect({ type: 'resume', code: saved.code, token: saved.token }, saved.base);

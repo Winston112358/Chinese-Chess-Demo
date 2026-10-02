@@ -17,3 +17,6 @@ Desktop.ini
 .vscode/
 *.tmp
 *.bak
+vendor/pikafish/*.exe
+vendor/pikafish/*.nnue
+vendor/pikafish/*.zip
