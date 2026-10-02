@@ -269,6 +269,32 @@ test('a legal nine-ply opening finishes by double-cannon checkmate', () => {
   assert.deepEqual(legalMoves(game, p(4, 0)), []);
 });
 
+test('the reported red pawn at (5,3) may move sideways after another piece screens the generals', () => {
+  let game = createInitialGame();
+  const opening = [
+    [4, 6, 4, 5], [4, 3, 4, 4], [4, 5, 4, 4], [7, 0, 6, 2],
+    [4, 4, 4, 3], [1, 2, 2, 2], [2, 6, 2, 5], [2, 2, 2, 5],
+    [4, 3, 4, 2], [6, 3, 6, 4],
+  ];
+  for (const [x, y, tx, ty] of opening) {
+    const result = applyMove(game, p(x, y), p(tx, ty));
+    assert.equal(result.ok, true, result.error);
+    game = result.game;
+  }
+  assert.equal(game.turn, 'red');
+  assert.deepEqual(legalMoves(game, p(4, 2)), [p(4, 1)]);
+  for (const x of [3, 5]) assert.match(validateMove(game, p(4, 2), p(x, 2)).error, /将帅照面/);
+  for (const [x, y, tx, ty] of [[3, 9, 4, 8], [8, 3, 8, 4]]) {
+    const result = applyMove(game, p(x, y), p(tx, ty));
+    assert.equal(result.ok, true, result.error);
+    game = result.game;
+  }
+  assert.deepEqual(legalMoves(game, p(4, 2)), [p(4, 1), p(3, 2), p(5, 2)]);
+  const moved = applyMove(game, p(4, 2), p(3, 2));
+  assert.equal(moved.ok, true, moved.error);
+  assert.deepEqual(undoMove(moved.game), game);
+});
+
 for (const side of ['red', 'black']) {
   test(`${side} can escape check by moving its general; check alone is not a loss`, () => {
     const game = fromRedPerspective(position([['black', 'rook', 4, 7]]), side);
@@ -359,5 +385,62 @@ for (const side of ['red', 'black']) {
     assert.equal(move.game.history.at(-1).captured.type, 'general');
     assert.deepEqual(undoMove(move.game), game);
     assert.equal(applyMove(undoMove(move.game), from, to).ok, true);
+  });
+
+  for (const defense of ['block', 'capture']) {
+    test(`${side} is not checkmated when a crossed pawn's horizontal ${defense} is its only legal defense`, () => {
+      const game = fromRedPerspective(position([
+        ['red', 'pawn', 3, 4], ['black', 'rook', 4, defense === 'block' ? 2 : 4],
+        ['black', 'rook', 3, 8], ['black', 'rook', 5, 8],
+      ]), side);
+      const from = perspectivePoint(side, 3, 4);
+      const to = perspectivePoint(side, 4, 4);
+      assert.equal(isInCheck(game.board, side), true);
+      assert.deepEqual(legalMoves(game, perspectivePoint(side, 4, 9)), []);
+      assert.deepEqual(legalMoves(game, from), [to]);
+      assert.equal(getGameResult(game), null);
+      const move = applyMove(game, from, to);
+      assert.equal(move.ok, true, move.error);
+      assert.equal(isInCheck(move.game.board, side), false);
+      assert.equal(move.game.history.at(-1).captured?.type ?? null, defense === 'capture' ? 'rook' : null);
+      assert.deepEqual(undoMove(move.game), game);
+    });
+  }
+
+  for (const capture of [false, true]) {
+    test(`${side} is not stalemated when a pawn's horizontal ${capture ? 'capture' : 'move'} on the last rank is its only legal move`, () => {
+      const pieces = [
+        ['red', 'pawn', 0, 0], ['black', 'rook', 3, 8], ['black', 'rook', 5, 8],
+      ];
+      if (capture) pieces.push(['black', 'pawn', 1, 0]);
+      const game = fromRedPerspective(position(pieces), side);
+      const from = perspectivePoint(side, 0, 0);
+      const to = perspectivePoint(side, 1, 0);
+      assert.equal(isInCheck(game.board, side), false);
+      assert.deepEqual(legalMoves(game, perspectivePoint(side, 4, 9)), []);
+      assert.deepEqual(legalMoves(game, from), [to]);
+      assert.equal(getGameResult(game), null);
+      const move = applyMove(game, from, to);
+      assert.equal(move.ok, true, move.error);
+      assert.equal(move.game.history.at(-1).captured?.type ?? null, capture ? 'pawn' : null);
+      assert.deepEqual(undoMove(move.game), game);
+    });
+  }
+
+  test(`${side} crossed pawn cannot move or capture sideways while it is the generals' only screen`, () => {
+    const fixture = position([['red', 'pawn', 4, 4], ['black', 'horse', 3, 4]]);
+    fixture.board[indexOf(p(5, 0))] = null;
+    fixture.board[indexOf(p(4, 0))] = { side: 'black', type: 'general' };
+    const game = fromRedPerspective(fixture, side);
+    const from = perspectivePoint(side, 4, 4);
+    for (const x of [3, 5]) {
+      const rejected = validateMove(game, from, perspectivePoint(side, x, 4));
+      assert.equal(rejected.ok, false);
+      assert.match(rejected.error, /将帅照面/);
+    }
+    assert.deepEqual(legalMoves(game, from), [perspectivePoint(side, 4, 3)]);
+    game.board[indexOf(perspectivePoint(side, 4, 7))] = { side, type: 'horse' };
+    allowed(game, from, perspectivePoint(side, 3, 4));
+    allowed(game, from, perspectivePoint(side, 5, 4));
   });
 }

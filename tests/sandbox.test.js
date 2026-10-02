@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialGame, applyMove, indexOf, pieceAt } from '../src/shared/rules.js';
+import { createInitialGame, applyMove, indexOf, pieceAt, legalMoves, otherSide } from '../src/shared/rules.js';
 import { createSandbox, rebaseSandbox, sandboxApplyMove, sandboxUndo } from '../src/shared/sandbox.js';
 
 const p = (x, y) => ({ x, y });
@@ -15,6 +15,34 @@ function move(sandbox, from, to) {
   const result = sandboxApplyMove(sandbox, from, to);
   assert.equal(result.ok, true, result.error);
   return result.sandbox;
+}
+
+for (const side of ['red', 'black']) {
+  test(`${side} sandbox undo across the river removes sideways moves and restores horizontal captures`, () => {
+    const beforeY = side === 'red' ? 5 : 4;
+    const step = side === 'red' ? -1 : 1;
+    const enemy = otherSide(side);
+    const enemyRookY = side === 'red' ? 1 : 8;
+    const real = position([
+      [side, 'pawn', 2, beforeY], [enemy, 'horse', 3, beforeY + step],
+      [enemy, 'rook', 8, enemyRookY],
+    ], side);
+    const before = structuredClone(real);
+    const baseline = createSandbox(real, 12);
+    assert.deepEqual(legalMoves(baseline.game, p(2, beforeY)), [p(2, beforeY + step)]);
+    const crossed = move(baseline, p(2, beforeY), p(2, beforeY + step));
+    const reply = move(crossed, p(8, enemyRookY), p(7, enemyRookY));
+    assert.ok(legalMoves(reply.game, p(2, beforeY + step)).some(({ x, y }) => x === 3 && y === beforeY + step));
+    const captured = move(reply, p(2, beforeY + step), p(3, beforeY + step));
+    assert.deepEqual(captured.game.history.at(-1).captured, { side: enemy, type: 'horse' });
+    assert.deepEqual(sandboxUndo(captured), reply);
+    assert.equal(sandboxUndo(captured).game.turn, side);
+    assert.deepEqual(sandboxUndo(reply), crossed);
+    const uncrossed = sandboxUndo(crossed);
+    assert.deepEqual(uncrossed, baseline);
+    assert.deepEqual(legalMoves(uncrossed.game, p(2, beforeY)), [p(2, beforeY + step)]);
+    assert.deepEqual(real, before);
+  });
 }
 
 test('sandbox deep-copies the real board, pieces, and result without borrowing real history', () => {

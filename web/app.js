@@ -204,7 +204,7 @@ function clickPoint(point) {
     }
     if (!selected) return notify(`沙盘：请选择${SIDE_NAMES[view.turn]}棋子`, true);
     const result = sandboxApplyMove(sandbox, selected, point);
-    if (!result.ok) return notify(`沙盘：${result.error}`, true);
+    if (!result.ok) return;
     sandbox = result.sandbox;
     selected = null;
     notify(`沙盘已推演 ${sandbox.game.history.length} 步；真实棋局不变`);
@@ -226,7 +226,7 @@ function clickPoint(point) {
   }
   if (!selected) return notify('请先选择当前回合的棋子', true);
   const result = room ? validateMove(game, selected, point) : applyMove(game, selected, point);
-  if (!result.ok) return notify(result.error, true);
+  if (!result.ok) return;
   if (room) {
     movePending = true;
     send({ type: 'move', from: selected, to: point, revision: room.revision });

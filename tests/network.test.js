@@ -317,3 +317,71 @@ test('a real checkmate from the starting position synchronizes the winner, stops
   const stopped = (await red.wait(state(moves.length, (room) => room.pendingRestart))).room;
   assert.deepEqual(stopped.clock.remainingMs, latest.clock.remainingMs);
 });
+
+test('both armies cross the river, move and capture sideways, synchronize clocks, and restore a sideways capture by consent', async (t) => {
+  const budgets = { red: 600_000, black: 900_000 };
+  const { server, red, seat, advance } = await timedRoom(t, budgets);
+  const black = await client(server.port);
+  black.send({ type: 'join', code: seat.code });
+  await black.wait((message) => message.type === 'seat');
+  await red.wait(state(0, (room) => room.clock.started));
+  await black.wait(state(0));
+  const moves = [
+    [0, 6, 0, 5], [8, 3, 8, 4], [0, 5, 0, 4], [8, 4, 8, 5],
+    [0, 4, 1, 4], [8, 5, 7, 5], [6, 6, 6, 5], [2, 3, 2, 4],
+    [1, 4, 2, 4], [7, 5, 6, 5],
+  ];
+  const positions = [];
+  for (const [revision, [x, y, tx, ty]] of moves.entries()) {
+    advance(100);
+    const movingSide = revision % 2 ? 'black' : 'red';
+    const nextSide = movingSide === 'red' ? 'black' : 'red';
+    const player = movingSide === 'red' ? red : black;
+    player.send({ type: 'move', from: { x, y }, to: { x: tx, y: ty }, revision });
+    const latest = (await red.wait(state(revision + 1))).room;
+    assert.deepEqual((await black.wait(state(revision + 1))).room, latest);
+    assert.equal(latest.game.result, null);
+    assert.equal(latest.game.turn, nextSide);
+    assert.equal(latest.clock.runningSide, nextSide);
+    assert.equal(latest.game.history.length, revision + 1);
+    assert.equal(latest.game.board[y * 9 + x], null);
+    assert.deepEqual(latest.game.board[ty * 9 + tx], { side: movingSide, type: 'pawn' });
+    assert.deepEqual(latest.clock.remainingMs, {
+      red: budgets.red - Math.ceil((revision + 1) / 2) * 100,
+      black: budgets.black - Math.floor((revision + 1) / 2) * 100,
+    });
+    assert.deepEqual(latest.game.history.at(-1).captured,
+      revision >= 8 ? { side: nextSide, type: 'pawn' } : null);
+    assert.equal(latest.game.history.filter((move) => move.captured).length, Math.max(0, revision - 7));
+    positions.push(latest.game);
+  }
+  const finishedVariation = positions.at(-1);
+  assert.deepEqual(finishedVariation.history.slice(-2).map((move) => ({ from: move.from, to: move.to, captured: move.captured })), [
+    { from: { x: 1, y: 4 }, to: { x: 2, y: 4 }, captured: { side: 'black', type: 'pawn' } },
+    { from: { x: 7, y: 5 }, to: { x: 6, y: 5 }, captured: { side: 'red', type: 'pawn' } },
+  ]);
+  advance(200);
+  black.send({ type: 'action-request', action: 'undo', revision: 10 });
+  const requested = (await red.wait(state(10, (room) => room.pendingAction?.action === 'undo'))).room;
+  assert.deepEqual((await black.wait(state(10, (room) => room.pendingAction?.action === 'undo'))).room, requested);
+  assert.deepEqual(requested.clock.remainingMs, { red: 599_300, black: 899_500 });
+  advance(300);
+  red.send({ type: 'action-answer', requestId: requested.pendingAction.id, accept: true });
+  const restored = (await red.wait(state(11))).room;
+  assert.deepEqual((await black.wait(state(11))).room, restored);
+  assert.deepEqual(restored.game, positions[8]);
+  assert.equal(restored.pendingAction, null);
+  assert.equal(restored.game.turn, 'black');
+  assert.equal(restored.clock.runningSide, 'black');
+  assert.deepEqual(restored.game.board[5 * 9 + 6], { side: 'red', type: 'pawn' });
+  assert.deepEqual(restored.game.board[5 * 9 + 7], { side: 'black', type: 'pawn' });
+  assert.deepEqual(restored.game.history.filter((move) => move.captured).map((move) => move.captured), [{ side: 'black', type: 'pawn' }]);
+  assert.deepEqual(restored.clock.remainingMs, { red: 599_000, black: 899_500 }, 'agreement must not refund move or voting time');
+  advance(100);
+  black.send({ type: 'move', from: { x: 7, y: 5 }, to: { x: 6, y: 5 }, revision: 11 });
+  const replayed = (await red.wait(state(12))).room;
+  assert.deepEqual((await black.wait(state(12))).room, replayed);
+  assert.deepEqual(replayed.game, finishedVariation);
+  assert.equal(replayed.clock.runningSide, 'red');
+  assert.deepEqual(replayed.clock.remainingMs, { red: 599_000, black: 899_400 });
+});
