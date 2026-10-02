@@ -84,6 +84,7 @@ main > .toolbar button { padding: 6px 11px; font-size: 14px; line-height: 1.4; w
 .point.piece.black { color: var(--piece-black, #202020); }
 .point.last { --last-ring: 0 0 0 2px var(--move-mark, #b78025); box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); border-style: dashed; }
 .point.selected { --piece-shadow: 0 8px 7px -3px #0007, 0 12px 12px -5px #0004; transform: translate(-50%, -50%) translateY(-4px) scale(1.12); box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); z-index: 3; }
+.point.moving { z-index: 4; transition: none; }
 @media (hover: hover) {
   .point.piece.selectable:hover { --hover-glow: 0 0 7px 2px #d92b3c80; }
 }

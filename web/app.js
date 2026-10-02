@@ -232,6 +232,7 @@ function render() {
   renderAi();
   renderBoard($('board'), {
     game: view, selected, flipped,
+    context: `${room ? `room:${room.code}` : aiHumanSide ? `ai:${aiHumanSide}` : 'local'}:${sandbox ? 'sandbox' : 'real'}`,
     canSelect: !view.result && (sandbox ? true : ready && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side) && (!aiHumanSide || game.turn === aiHumanSide)),
     moves: selected ? legalMoves(view, selected) : [],
     danger: dangerPoints(view),

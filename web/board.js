@@ -3,6 +3,42 @@ import { pieceGlyph } from '/piece-glyph.js';
 
 const samePoint = (a, b) => a && b && a.x === b.x && a.y === b.y;
 const line = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+const boardViews = new WeakMap();
+const MOVE_DURATION_MS = 160;
+
+function singleMove(previous, game, board, context, flipped) {
+  if (!previous || previous.context !== context || previous.flipped !== flipped
+    || game.history.length !== previous.historyLength + 1) return null;
+  const move = game.history.at(-1);
+  if (!move) return null;
+  const from = indexOf(move.from);
+  const to = indexOf(move.to);
+  if (!previous.board[from] || board[from] !== null || board[to] !== previous.board[from]) return null;
+  return board.every((piece, index) => index === from || index === to || piece === previous.board[index])
+    ? move : null;
+}
+
+function slidePiece(state, button, origin) {
+  if (!origin.width || typeof button.animate !== 'function') return;
+  // A recently vacated square may still be finishing its selection transition.
+  button.classList.add('moving');
+  const target = button.getBoundingClientRect();
+  if (!target.width) { button.classList.remove('moving'); return; }
+  const dx = origin.left + origin.width / 2 - target.left - target.width / 2;
+  const dy = origin.top + origin.height / 2 - target.top - target.height / 2;
+  const animation = button.animate([
+    { transform: `translate(-50%, -50%) translate(${dx}px, ${dy}px) scale(${origin.width / target.width})` },
+    { transform: 'translate(-50%, -50%) translate(0px, 0px) scale(1)' },
+  ], { duration: MOVE_DURATION_MS, easing: 'linear' });
+  state.motion = { button, animation };
+  const finish = () => {
+    if (state.motion?.animation !== animation) return;
+    button.classList.remove('moving');
+    state.motion = null;
+  };
+  animation.onfinish = finish;
+  animation.oncancel = finish;
+}
 
 function gridSvg() {
   let lines = '';
@@ -17,10 +53,13 @@ function gridSvg() {
     <g class="board-river" font-size="48" text-anchor="middle"><text x="150" y="314.4">楚 河</text><text x="390" y="314.4">汉 界</text></g></svg>`;
 }
 
-export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick, danger = [] }) {
+export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick, danger = [], context = 'real' }) {
+  let state = boardViews.get(element);
   let buttons = element.querySelectorAll('.point');
   // Keep the nodes so a selection change animates the lift and preserves keyboard focus.
   if (buttons.length !== COLS * ROWS) {
+    state?.motion?.animation.cancel();
+    state = undefined;
     element.innerHTML = gridSvg();
     for (let i = 0; i < COLS * ROWS; i++) {
       const button = document.createElement('button');
@@ -30,6 +69,20 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
     }
     buttons = element.querySelectorAll('.point');
   }
+  const board = game.board.map((piece) => piece ? `${piece.side}:${piece.type}` : null);
+  const move = singleMove(state, game, board, context, flipped);
+  const origin = move ? buttons[indexOf(move.from)].getBoundingClientRect() : null;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const changed = !state || state.context !== context || state.flipped !== flipped
+    || state.historyLength !== game.history.length || board.some((piece, index) => piece !== state.board[index]);
+  if (state?.motion && (changed || reducedMotion)) {
+    state.motion.button.classList.remove('moving');
+    state.motion.animation.cancel();
+    state.motion = null;
+  }
+  state ||= {};
+  Object.assign(state, { board, context, flipped, historyLength: game.history.length });
+  boardViews.set(element, state);
   const last = game.history.at(-1);
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
@@ -38,6 +91,8 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
       const button = buttons[indexOf(point)];
       const threatened = Boolean(piece && danger.some((target) => samePoint(target, point)));
       const classes = ['point'];
+      // AI status and selection updates can redraw this same position mid-slide.
+      if (state.motion?.button === button) classes.push('moving');
       if (piece) classes.push('piece', piece.side);
       if (threatened) classes.push('danger');
       if (piece && canSelect && piece.side === game.turn) classes.push('selectable');
@@ -65,4 +120,5 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
       button.onclick = () => onClick(point);
     }
   }
+  if (move && !reducedMotion) slidePiece(state, buttons[indexOf(move.to)], origin);
 }
