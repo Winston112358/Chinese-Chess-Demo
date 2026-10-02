@@ -3,7 +3,7 @@ export const ROWS = 10;
 export const SIDE_NAMES = { red: '红方', black: '黑方' };
 export const PIECE_NAMES = {
   red: { general: '帅', advisor: '仕', elephant: '相', horse: '马', rook: '车', cannon: '炮', pawn: '兵' },
-  black: { general: '将', advisor: '士', elephant: '象', horse: '马', rook: '车', cannon: '炮', pawn: '卒' },
+  black: { general: '将', advisor: '士', elephant: '象', horse: '马', rook: '车', cannon: '砲', pawn: '卒' },
 };
 
 export const otherSide = (side) => side === 'red' ? 'black' : 'red';

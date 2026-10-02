@@ -45,6 +45,7 @@ function render() {
   }
   renderBoard($('board'), {
     game, selected, flipped,
+    canSelect: ready && !connecting && !movePending && !room?.pendingRestart && (!room || game.turn === side),
     moves: selected ? legalMoves(game, selected) : [],
     onClick: clickPoint,
   });
@@ -77,6 +78,7 @@ function clickPoint(point) {
   if (room) {
     movePending = true;
     send({ type: 'move', from: selected, to: point, revision: room.revision });
+    render();
   } else {
     game = localGame = result.game;
     selected = null;

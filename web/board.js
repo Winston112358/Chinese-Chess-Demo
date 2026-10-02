@@ -16,16 +16,28 @@ function gridSvg() {
     <g font-size="22" fill="#80633d" text-anchor="middle"><text x="150" y="307">楚 河</text><text x="390" y="307">汉 界</text></g></svg>`;
 }
 
-export function renderBoard(element, { game, selected, moves, flipped, onClick }) {
-  element.innerHTML = gridSvg();
+export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick }) {
+  let buttons = element.querySelectorAll('.point');
+  // Keep the nodes so a selection change animates the lift and preserves keyboard focus.
+  if (buttons.length !== COLS * ROWS) {
+    element.innerHTML = gridSvg();
+    for (let i = 0; i < COLS * ROWS; i++) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'point';
+      element.append(button);
+    }
+    buttons = element.querySelectorAll('.point');
+  }
   const last = game.history.at(-1);
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       const point = { x, y };
       const piece = game.board[indexOf(point)];
-      const button = document.createElement('button');
+      const button = buttons[indexOf(point)];
       const classes = ['point'];
       if (piece) classes.push('piece', piece.side);
+      if (piece && canSelect && piece.side === game.turn) classes.push('selectable');
       if (samePoint(point, selected)) classes.push('selected');
       if (moves.some((move) => samePoint(move, point))) classes.push('legal');
       if (samePoint(point, last?.from) || samePoint(point, last?.to)) classes.push('last');
@@ -39,8 +51,7 @@ export function renderBoard(element, { game, selected, moves, flipped, onClick }
       button.setAttribute('aria-label', `${name}，第${x + 1}列第${y + 1}行`);
       button.setAttribute('aria-pressed', String(Boolean(samePoint(point, selected))));
       button.title = `${name} (${x + 1}, ${y + 1})`;
-      button.addEventListener('click', () => onClick(point));
-      element.append(button);
+      button.onclick = () => onClick(point);
     }
   }
 }
