@@ -13,7 +13,7 @@ function gridSvg() {
   }
   for (const y of [30, 450]) lines += line(210, y, 330, y + 120) + line(330, y, 210, y + 120);
   return `<svg viewBox="0 0 540 600" aria-hidden="true"><g stroke="#80633d" stroke-width="1.5">${lines}</g>
-    <g font-size="22" fill="#80633d" text-anchor="middle"><text x="150" y="307">楚 河</text><text x="390" y="307">汉 界</text></g></svg>`;
+    <g font-size="48" fill="#80633d" text-anchor="middle"><text x="150" y="314.4">楚 河</text><text x="390" y="314.4">汉 界</text></g></svg>`;
 }
 
 export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick }) {

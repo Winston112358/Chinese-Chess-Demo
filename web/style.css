@@ -22,9 +22,9 @@ input { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius: 4px; }
 .message { min-height: 26px; margin: 5px 0 12px; color: #444; }
 .message.error { color: #a32020; }
 .game-layout { display: grid; grid-template-columns: minmax(0, 540px) minmax(260px, 1fr); gap: 24px; align-items: start; }
-.board { width: 100%; max-width: 540px; aspect-ratio: 9 / 10; position: relative; background: #f0dfbe; border: 1px solid #997d50; user-select: none; font-family: var(--chess-font); }
+.board { width: 100%; max-width: 540px; aspect-ratio: 9 / 10; position: relative; background: #f0dfbe; border: 1px solid #997d50; user-select: none; font-family: var(--chess-font); container-type: inline-size; }
 .board svg { width: 100%; height: 100%; display: block; pointer-events: none; }
-.point { --piece-shadow: 0 0 0 0 transparent; --last-ring: 0 0 0 0 transparent; --hover-glow: 0 0 0 0 transparent; position: absolute; transform: translate(-50%, -50%); width: 8%; height: 7.2%; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; display: grid; place-items: center; font-size: clamp(20px, 6vw, 32px); font-weight: normal; line-height: 1; transition: transform 150ms ease, box-shadow 150ms ease; }
+.point { --piece-shadow: 0 0 0 0 transparent; --last-ring: 0 0 0 0 transparent; --hover-glow: 0 0 0 0 transparent; position: absolute; transform: translate(-50%, -50%); width: 8%; height: 7.2%; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; display: grid; place-items: center; font-size: min(38px, 7.04cqw); font-weight: normal; line-height: 1; transition: transform 150ms ease, box-shadow 150ms ease; }
 .point:hover:not(:disabled) { background: transparent; }
 .point.piece, .point.piece:hover:not(:disabled) { background: #fff6df; }
 .point.piece { --piece-shadow: 0 1px 2px #0003; border-color: #494139; box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); z-index: 1; }

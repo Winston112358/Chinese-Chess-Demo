@@ -47,7 +47,7 @@ npm run desktop
 npm run dist:win
 ```
 
-输出为 `dist/Chinese-Chess-Demo-0.1.2-x64.exe`。复制此文件到 Windows 电脑后即可运行，无需安装 Node.js。首次构建会下载 Electron 和打包工具。
+输出为 `dist/Chinese-Chess-Demo-0.1.3-x64.exe`。复制此文件到 Windows 电脑后即可运行，无需安装 Node.js。首次构建会下载 Electron 和打包工具。
 
 EXE 内置服务器，默认监听 3000 端口；端口被占用时会自动使用其他空闲端口。实际可分享的地址在界面“本机可分享的局域网地址”中查看。
 
