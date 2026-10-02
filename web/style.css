@@ -1,5 +1,7 @@
 @font-face { font-family: "Xiangqi Xingkai"; src: url('/fonts/xiangqi-xingkai.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: block; }
-:root { --chess-font: "Xiangqi Xingkai", "STXingkai", "华文行楷", "KaiTi", "楷体", serif; font-family: "Microsoft YaHei", system-ui, sans-serif; color: #222; background: #f5f5f5; }
+@font-face { font-family: "Xiangqi Running"; src: url('/fonts/xiangqi-running.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: block; }
+@font-face { font-family: "Xiangqi Kai"; src: url('/fonts/xiangqi-kai.woff2') format('woff2'); font-style: normal; font-weight: 400; font-display: block; }
+:root { --chess-font: "Xiangqi Running", "Xiangqi Kai"; font-family: "Microsoft YaHei", system-ui, sans-serif; color: #222; background: #f5f5f5; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 main { max-width: 1050px; margin: 0 auto; padding: 20px; }
@@ -31,15 +33,23 @@ input, select { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius
 .clock.low time { color: #a32020; }
 .clock-panel p { grid-column: 1 / -1; margin: 0; }
 .game-layout { display: grid; grid-template-columns: minmax(0, 540px) minmax(260px, 1fr); gap: 24px; align-items: start; }
-.board { width: 100%; max-width: 540px; aspect-ratio: 9 / 10; position: relative; background: #f0dfbe; border: 1px solid #997d50; user-select: none; font-family: var(--chess-font); container-type: inline-size; }
-.board svg { width: 100%; height: 100%; display: block; pointer-events: none; }
-.point { --piece-shadow: 0 0 0 0 transparent; --last-ring: 0 0 0 0 transparent; --hover-glow: 0 0 0 0 transparent; position: absolute; transform: translate(-50%, -50%); width: 8%; height: 7.2%; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; display: grid; place-items: center; font-size: min(38px, 7.04cqw); font-weight: normal; line-height: 1; transition: transform 150ms ease, box-shadow 150ms ease; }
+.board { width: 100%; max-width: 540px; aspect-ratio: 9 / 10; position: relative; background-color: var(--board-bg, #f0dfbe); background-image: var(--board-texture, none); border: 1px solid var(--board-edge, #997d50); user-select: none; font-family: var(--chess-font); font-synthesis: none; container-type: inline-size; }
+:root[data-font="running"], .board[data-font="running"] { --chess-font: "Xiangqi Running", "Xiangqi Kai"; }
+:root[data-font="kai"], .board[data-font="kai"] { --chess-font: "Xiangqi Kai"; }
+:root[data-font="cursive"], .board[data-font="cursive"] { --chess-font: "Xiangqi Xingkai", "Xiangqi Kai"; }
+.board > svg { width: 100%; height: 100%; display: block; pointer-events: none; }
+.piece-glyph { display: block; width: 1em; height: 1em; overflow: visible; pointer-events: none; flex: none; }
+.piece-glyph text { font-family: var(--chess-font); font-synthesis: none; }
+.board-grid { stroke: var(--board-line, #80633d); }
+.board-river { fill: var(--board-line, #80633d); }
+.board .point, .board-river { font-family: var(--chess-font); }
+.point { --piece-shadow: 0 0 0 0 transparent; --last-ring: 0 0 0 0 transparent; --hover-glow: 0 0 0 0 transparent; position: absolute; transform: translate(-50%, -50%); width: 8%; height: 7.2%; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; display: grid; place-items: center; place-content: center; font-size: min(38px, max(0px, calc(8cqw - 8px))); font-weight: normal; line-height: 1; transition: transform 150ms ease, box-shadow 150ms ease; }
 .point:hover:not(:disabled) { background: transparent; }
-.point.piece, .point.piece:hover:not(:disabled) { background: #fff6df; }
-.point.piece { --piece-shadow: 0 1px 2px #0003; border-color: #494139; box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); z-index: 1; }
-.point.piece.red { color: #a32020; border-color: #a32020; }
-.point.piece.black { color: #202020; }
-.point.last { --last-ring: 0 0 0 2px #b78025; box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); border-style: dashed; }
+.point.piece, .point.piece:hover:not(:disabled) { background: var(--piece-bg, #fff6df); }
+.point.piece { --piece-shadow: 0 1px 2px #0003; border-color: var(--piece-black, #494139); box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); z-index: 1; }
+.point.piece.red { color: var(--piece-red, #a32020); border-color: var(--piece-red, #a32020); }
+.point.piece.black { color: var(--piece-black, #202020); }
+.point.last { --last-ring: 0 0 0 2px var(--move-mark, #b78025); box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); border-style: dashed; }
 .point.selected { --piece-shadow: 0 8px 7px -3px #0007, 0 12px 12px -5px #0004; transform: translate(-50%, -50%) translateY(-4px) scale(1.12); box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); z-index: 3; }
 @media (hover: hover) {
   .point.piece.selectable:hover { --hover-glow: 0 0 7px 2px #d92b3c80; }
@@ -47,8 +57,8 @@ input, select { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius
 @media (prefers-reduced-motion: reduce) {
   .point { transition: none; }
 }
-.point.legal:not(.piece)::after { content: ''; width: 12px; height: 12px; background: #23713b; border-radius: 50%; }
-.point.legal.piece { outline: 3px solid #23713b; outline-offset: 2px; }
+.point.legal:not(.piece)::after { content: ''; width: 12px; height: 12px; background: var(--legal-mark, #23713b); border-radius: 50%; }
+.point.legal.piece { outline: 3px solid var(--legal-mark, #23713b); outline-offset: 2px; }
 .panel { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 14px; margin-bottom: 16px; }
 .panel p { margin: 10px 0; font-size: 14px; }
 .panel label { display: block; margin-bottom: 6px; font-size: 14px; }

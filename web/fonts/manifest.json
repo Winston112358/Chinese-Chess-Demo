@@ -1,0 +1,54 @@
+{
+  "required_characters": "帅仕相马车炮兵将士象砲卒楚河汉界 ",
+  "outline_limits": {
+    "center": [
+      500,
+      300
+    ],
+    "max_axis_units": 850,
+    "pre_round_control_radius_units": 474,
+    "final_control_radius_units": 475
+  },
+  "builder_dependencies": {
+    "fonttools": "4.62.1",
+    "brotli": "1.0.9"
+  },
+  "fonts": [
+    {
+      "family": "Xiangqi Xingkai",
+      "source_name": "Zhi Mang Xing",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/zhimangxing/ZhiMangXing-Regular.ttf",
+      "source_sha256": "644e0cae9b40f0b10ab729a01bd32032e3973bac22be3dccae01bf6ae7fde969",
+      "license": "OFL.txt",
+      "fallback_characters": "",
+      "file": "xiangqi-xingkai.woff2",
+      "characters": "帅仕相马车炮兵将士象砲卒楚河汉界 ",
+      "sha256": "3a68162dbde501bb045258777ad3e901b23ad7a7eee25a1ad606007b61d63623",
+      "license_sha256": "d33c2c71eabc6755aa5601d1cecc57633eeb356d16c3d1106e23e1371213cb1e"
+    },
+    {
+      "family": "Xiangqi Running",
+      "source_name": "Long Cang",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/longcang/LongCang-Regular.ttf",
+      "source_sha256": "e5bf2c3f24ef2327c6f136d8f73e2f9dfdf44896fdbeb35a9515f44777bb91bc",
+      "license": "OFL-longcang.txt",
+      "fallback_characters": "砲",
+      "file": "xiangqi-running.woff2",
+      "characters": "帅仕相马车炮兵将士象卒楚河汉界 ",
+      "sha256": "2e55e7fee26e2d902a6ae3fc32439243ecb21e89d1af3de3fe59857fbd2afe7c",
+      "license_sha256": "603546b7219a94bb59bf8294458194a5010119486354092b66a09a3fd61aeacc"
+    },
+    {
+      "family": "Xiangqi Kai",
+      "source_name": "LXGW WenKai Regular v1.522",
+      "source_url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
+      "source_sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
+      "license": "OFL-wenkai.txt",
+      "fallback_characters": "",
+      "file": "xiangqi-kai.woff2",
+      "characters": "帅仕相马车炮兵将士象砲卒楚河汉界 ",
+      "sha256": "75d5f0beb84c9fdc8f8a3b478f6f728882e39a29d136d30907a3da26c63948d6",
+      "license_sha256": "c38b1994a5e48ac30ac7d1da7d0409fd8fd8127dfe28a13d6e787d5b1ef34a5e"
+    }
+  ]
+}

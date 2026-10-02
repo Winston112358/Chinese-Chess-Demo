@@ -1,0 +1,257 @@
+/* Local appearance presets. These variables are shared by the board and previews. */
+#board[data-skin="ivory"],
+.skin-swatch[data-skin="ivory"] {
+  --board-bg: #f4ead5;
+  --board-texture: none;
+  --board-line: #796544;
+  --board-edge: #aa9167;
+  --piece-bg: #fffaf0;
+  --piece-red: #a12d26;
+  --piece-black: #292823;
+  --move-mark: #a76a1c;
+  --legal-mark: #247146;
+}
+
+#board[data-skin="celadon"],
+.skin-swatch[data-skin="celadon"] {
+  --board-bg: #dce9e1;
+  --board-texture: none;
+  --board-line: #557065;
+  --board-edge: #7c9789;
+  --piece-bg: #f5faf5;
+  --piece-red: #a52c35;
+  --piece-black: #233b34;
+  --move-mark: #a16820;
+  --legal-mark: #226f56;
+}
+
+#board[data-skin="mist"],
+.skin-swatch[data-skin="mist"] {
+  --board-bg: #dfe9f0;
+  --board-texture: none;
+  --board-line: #546c84;
+  --board-edge: #7e94a9;
+  --piece-bg: #f5f9fd;
+  --piece-red: #a12e3f;
+  --piece-black: #233950;
+  --move-mark: #a46b1d;
+  --legal-mark: #256952;
+}
+
+#board[data-skin="lotus"],
+.skin-swatch[data-skin="lotus"] {
+  --board-bg: #efe2e5;
+  --board-texture: none;
+  --board-line: #795d6a;
+  --board-edge: #a68b95;
+  --piece-bg: #fff7f7;
+  --piece-red: #a32c42;
+  --piece-black: #493246;
+  --move-mark: #99601f;
+  --legal-mark: #2c6b54;
+}
+
+#board[data-skin="beech"],
+.skin-swatch[data-skin="beech"] {
+  --board-bg: #f0dfbf;
+  --board-texture: repeating-linear-gradient(92deg, transparent 0 10px, #9566280a 11px 12px, transparent 13px 25px), repeating-linear-gradient(88deg, #fff7e40e 0 3px, transparent 4px 18px, #98672c08 19px 20px, transparent 21px 36px);
+  --board-line: #795d37;
+  --board-edge: #a08356;
+  --piece-bg: #fff7e7;
+  --piece-red: #a22d24;
+  --piece-black: #302b24;
+  --move-mark: #9b631d;
+  --legal-mark: #2a7042;
+}
+
+#board[data-skin="walnut"],
+.skin-swatch[data-skin="walnut"] {
+  --board-bg: #e8d9ca;
+  --board-texture: repeating-linear-gradient(91deg, transparent 0 14px, #78533d0b 15px 17px, transparent 18px 31px), repeating-linear-gradient(87deg, #fff5eb0d 0 5px, transparent 6px 23px, #77513b08 24px 25px, transparent 26px 43px);
+  --board-line: #755b49;
+  --board-edge: #a18b76;
+  --piece-bg: #fff6ea;
+  --piece-red: #9d2b2e;
+  --piece-black: #362e2a;
+  --move-mark: #986124;
+  --legal-mark: #2b704b;
+}
+
+.appearance-panel {
+  min-width: 0;
+}
+
+.appearance-panel h2 small {
+  margin-left: 6px;
+  color: #6a665f;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.appearance-panel #board-font {
+  margin-bottom: 12px;
+  color: #292823;
+}
+
+.appearance-panel .skin-options {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #dedbd5;
+  border-radius: 6px;
+}
+
+.appearance-panel .skin-options legend {
+  padding: 0 5px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.appearance-panel .skin-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.appearance-panel .skin-group + .skin-group {
+  margin-top: 12px;
+}
+
+.appearance-panel .skin-group h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6d665e;
+}
+
+.appearance-panel .skin-choice {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 5px;
+  border: 2px solid #dedbd5;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.appearance-panel .skin-choice:hover {
+  border-color: #a39279;
+  background: #faf8f4;
+}
+
+.appearance-panel .skin-choice:has(input:checked) {
+  border-color: #806441;
+  background: #f8f3e9;
+  box-shadow: 0 0 0 1px #806441;
+}
+
+.appearance-panel .skin-choice:focus-within {
+  outline: 3px solid #167fc0;
+  outline-offset: 3px;
+}
+
+.appearance-panel .skin-choice input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.appearance-panel .skin-name {
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #39342d;
+}
+
+.appearance-panel .skin-choice:has(input:checked) .skin-name {
+  font-weight: 600;
+  color: #604725;
+}
+
+.appearance-panel .skin-swatch {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 47px;
+  overflow: hidden;
+  border: 1px solid var(--board-edge);
+  border-radius: 3px;
+  background-color: var(--board-bg);
+  background-image: var(--board-texture), repeating-linear-gradient(0deg, transparent 0 14px, color-mix(in srgb, var(--board-line) 40%, transparent) 14px 15px, transparent 15px 29px), repeating-linear-gradient(90deg, transparent 0 16px, color-mix(in srgb, var(--board-line) 40%, transparent) 16px 17px, transparent 17px 33px);
+}
+
+.appearance-panel .swatch-piece {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  place-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background: var(--piece-bg);
+  box-shadow: 0 1px 2px #0002;
+  font: 400 21px / 1 var(--chess-font);
+}
+
+.appearance-panel .swatch-piece.red {
+  left: calc(50% - 31px);
+  color: var(--piece-red);
+}
+
+.appearance-panel .swatch-piece.black {
+  left: calc(50% + 3px);
+  color: var(--piece-black);
+}
+
+.appearance-panel .appearance-note,
+.appearance-panel .appearance-status {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.appearance-panel .appearance-note {
+  color: #6a665f;
+}
+
+.appearance-panel .appearance-status {
+  min-height: 1.6em;
+  color: #4d6253;
+  overflow-wrap: anywhere;
+}
+
+.appearance-panel .appearance-status.error {
+  color: #a32020;
+}
+
+@media (max-width: 760px) and (min-width: 400px) {
+  .appearance-panel .skin-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .appearance-panel .skin-swatch {
+    height: 54px;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .appearance-panel .skin-choice {
+    transition: none;
+  }
+}

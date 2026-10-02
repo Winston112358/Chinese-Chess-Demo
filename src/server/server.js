@@ -9,8 +9,13 @@ const assets = new Map([
   ['/index.html', ['../../web/index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['../../web/app.js', 'text/javascript; charset=utf-8']],
   ['/board.js', ['../../web/board.js', 'text/javascript; charset=utf-8']],
+  ['/piece-glyph.js', ['../../web/piece-glyph.js', 'text/javascript; charset=utf-8']],
   ['/style.css', ['../../web/style.css', 'text/css; charset=utf-8']],
+  ['/appearance.css', ['../../web/appearance.css', 'text/css; charset=utf-8']],
+  ['/appearance.js', ['../../web/appearance.js', 'text/javascript; charset=utf-8']],
   ['/fonts/xiangqi-xingkai.woff2', ['../../web/fonts/xiangqi-xingkai.woff2', 'font/woff2']],
+  ['/fonts/xiangqi-running.woff2', ['../../web/fonts/xiangqi-running.woff2', 'font/woff2']],
+  ['/fonts/xiangqi-kai.woff2', ['../../web/fonts/xiangqi-kai.woff2', 'font/woff2']],
   ['/shared/rules.js', ['../shared/rules.js', 'text/javascript; charset=utf-8']],
 ]);
 

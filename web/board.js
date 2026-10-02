@@ -1,4 +1,5 @@
 import { COLS, ROWS, PIECE_NAMES, SIDE_NAMES, indexOf } from '/shared/rules.js';
+import { pieceGlyph } from '/piece-glyph.js';
 
 const samePoint = (a, b) => a && b && a.x === b.x && a.y === b.y;
 const line = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
@@ -12,8 +13,8 @@ function gridSvg() {
     else lines += line(px, 30, px, 270) + line(px, 330, px, 570);
   }
   for (const y of [30, 450]) lines += line(210, y, 330, y + 120) + line(330, y, 210, y + 120);
-  return `<svg viewBox="0 0 540 600" aria-hidden="true"><g stroke="#80633d" stroke-width="1.5">${lines}</g>
-    <g font-size="48" fill="#80633d" text-anchor="middle"><text x="150" y="314.4">楚 河</text><text x="390" y="314.4">汉 界</text></g></svg>`;
+  return `<svg viewBox="0 0 540 600" aria-hidden="true"><g class="board-grid" stroke-width="1.5">${lines}</g>
+    <g class="board-river" font-size="48" text-anchor="middle"><text x="150" y="314.4">楚 河</text><text x="390" y="314.4">汉 界</text></g></svg>`;
 }
 
 export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick }) {
@@ -47,7 +48,15 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
       button.dataset.x = x;
       button.dataset.y = y;
       const name = piece ? `${SIDE_NAMES[piece.side]}${PIECE_NAMES[piece.side][piece.type]}` : '空位';
-      button.textContent = piece ? PIECE_NAMES[piece.side][piece.type] : '';
+      if (piece) {
+        let glyph = button.querySelector('.piece-glyph');
+        if (!glyph) {
+          glyph = pieceGlyph(PIECE_NAMES[piece.side][piece.type]);
+          button.replaceChildren(glyph);
+        } else {
+          glyph.firstElementChild.textContent = PIECE_NAMES[piece.side][piece.type];
+        }
+      } else button.replaceChildren();
       button.setAttribute('aria-label', `${name}，第${x + 1}列第${y + 1}行`);
       button.setAttribute('aria-pressed', String(Boolean(samePoint(point, selected))));
       button.title = `${name} (${x + 1}, ${y + 1})`;

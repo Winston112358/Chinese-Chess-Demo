@@ -1,11 +1,14 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-font="running">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>中国象棋 Demo</title>
-  <link rel="preload" href="/fonts/xiangqi-xingkai.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/xiangqi-running.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/xiangqi-kai.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/appearance.css">
+  <script type="module" src="/appearance.js"></script>
   <script type="module" src="/app.js"></script>
 </head>
 <body>
@@ -38,10 +41,37 @@
           <p id="time-control-summary" class="hint"></p>
           <p id="clock-info" class="hint"></p>
         </div>
-        <div id="board" class="board" role="group" aria-label="象棋棋盘"></div>
+        <div id="board" class="board" data-font="running" data-skin="ivory" role="group" aria-label="象棋棋盘"></div>
         <p class="hint">棋子位于交叉点。已走的最后一步以虚线标记。</p>
       </section>
       <aside>
+        <section class="panel appearance-panel" aria-labelledby="appearance-heading">
+          <h2 id="appearance-heading">棋局外观 <small>仅自己可见</small></h2>
+          <label for="board-font">棋子与河界字体</label>
+          <select id="board-font" aria-describedby="font-note">
+            <option value="running">行书 · 龙藏衍生</option>
+            <option value="kai">楷体 · 文楷衍生</option>
+            <option value="cursive">草书 · 志莽行书衍生</option>
+          </select>
+          <p id="font-note" class="appearance-note">字库随软件提供，缺字逐字回退到自带楷体。</p>
+          <fieldset class="skin-options">
+            <legend>棋局皮肤</legend>
+            <div class="skin-group">
+              <h3>纯色配对</h3>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="ivory" checked><span class="skin-swatch" data-skin="ivory" aria-hidden="true"></span><span class="skin-name">米白 · 朱砂</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="celadon"><span class="skin-swatch" data-skin="celadon" aria-hidden="true"></span><span class="skin-name">青瓷 · 墨色</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="mist"><span class="skin-swatch" data-skin="mist" aria-hidden="true"></span><span class="skin-name">雾蓝 · 藏青</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="lotus"><span class="skin-swatch" data-skin="lotus" aria-hidden="true"></span><span class="skin-name">浅藕 · 紫檀</span></label>
+            </div>
+            <div class="skin-group">
+              <h3>浅木纹</h3>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="beech"><span class="skin-swatch" data-skin="beech" aria-hidden="true"></span><span class="skin-name">浅榉木</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="walnut"><span class="skin-swatch" data-skin="walnut" aria-hidden="true"></span><span class="skin-name">浅胡桃木</span></label>
+            </div>
+          </fieldset>
+          <p class="appearance-note">房主和参与者可各自选择。此设备会记住你的外观偏好。</p>
+          <p id="appearance-status" class="appearance-status" role="status" aria-live="polite"></p>
+        </section>
         <section class="panel">
           <h2>局域网联机</h2>
           <label for="server">房主的服务器地址</label>

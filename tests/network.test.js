@@ -45,10 +45,20 @@ test('HTTP serves only app assets and reports LAN addresses', async (t) => {
   const server = await startServer({ port: 0, host: '127.0.0.1' });
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.port}`;
-  for (const path of ['/', '/style.css', '/app.js', '/board.js', '/shared/rules.js']) {
+  for (const path of ['/', '/style.css', '/appearance.css', '/app.js', '/appearance.js', '/board.js', '/piece-glyph.js', '/shared/rules.js']) {
     const response = await fetch(base + path);
     assert.equal(response.status, 200);
     assert.ok((await response.text()).length > 20);
+  }
+  for (const path of ['/fonts/xiangqi-running.woff2', '/fonts/xiangqi-kai.woff2', '/fonts/xiangqi-xingkai.woff2']) {
+    const response = await fetch(base + path);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'font/woff2');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    assert.equal(bytes.toString('ascii', 0, 4), 'wOF2');
+    const head = await fetch(base + path, { method: 'HEAD' });
+    assert.equal(head.status, 200);
+    assert.equal((await head.arrayBuffer()).byteLength, 0);
   }
   assert.ok(Array.isArray((await (await fetch(base + '/api/server-info')).json()).addresses));
   for (const path of ['/package.json', '/.git/config', '/src/server/rooms.js']) {
