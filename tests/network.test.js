@@ -127,3 +127,139 @@ test('two clients synchronize, server rejects illegal moves, reconnect restores 
   assert.equal(restarted.room.game.turn, 'red');
   assert.deepEqual((await resumed.wait(state(4))).room, restarted.room);
 });
+
+async function timedRoom(t, timeControl = { red: 6000, black: 900_000 }) {
+  let elapsed = 0;
+  const server = await startServer({ port: 0, host: '127.0.0.1', roomOptions: { now: () => elapsed, clockTickMs: 10 } });
+  t.after(() => server.close());
+  const red = await client(server.port);
+  red.send({ type: 'create', timeControl });
+  const seat = await red.wait((message) => message.type === 'seat');
+  const waiting = await red.wait(state(0));
+  return { server, red, seat, waiting, advance: (milliseconds) => { elapsed += milliseconds; } };
+}
+
+test('room clocks start together, change only after legal moves, and reject expired moves at the exact deadline', async (t) => {
+  const { server, red, seat, waiting, advance } = await timedRoom(t, { red: 6000, black: 9000 });
+  assert.equal(waiting.room.clock.started, false);
+  assert.deepEqual(waiting.room.clock.initialMs, { red: 6000, black: 9000 });
+  advance(50_000);
+  const black = await client(server.port);
+  black.send({ type: 'join', code: seat.code, timeControl: { red: 10_800_000, black: 10_800_000 } });
+  await black.wait((message) => message.type === 'seat');
+  const initial = (await red.wait(state(0, (room) => room.clock.started))).room;
+  await black.wait(state(0));
+  assert.equal(initial.clock.runningSide, 'red');
+  assert.deepEqual(initial.clock.remainingMs, { red: 6000, black: 9000 });
+  advance(1000);
+  red.send({ type: 'move', from: { x: 0, y: 6 }, to: { x: 1, y: 6 }, revision: 0 });
+  assert.match((await red.wait(error)).error, /兵卒/);
+  advance(500);
+  red.send({ type: 'move', from: { x: 0, y: 6 }, to: { x: 0, y: 5 }, revision: 0 });
+  const moved = (await red.wait(state(1))).room;
+  assert.deepEqual((await black.wait(state(1))).room, moved);
+  assert.deepEqual(moved.clock.remainingMs, { red: 4500, black: 9000 });
+  assert.equal(moved.clock.runningSide, 'black');
+  advance(9000);
+  black.send({ type: 'move', from: { x: 0, y: 3 }, to: { x: 0, y: 4 }, revision: 1 });
+  const ended = (await black.wait(state(2, (room) => room.game.result))).room;
+  assert.deepEqual(ended.game.result, { winner: 'red', loser: 'black', reason: 'timeout' });
+  assert.equal(ended.game.history.length, 1);
+  assert.equal(ended.clock.runningSide, null);
+  assert.equal(ended.clock.remainingMs.black, 0);
+  assert.match((await black.wait(error)).error, /结束/);
+  assert.deepEqual((await red.wait(state(2))).room.game, ended.game);
+});
+
+test('idle and disconnected players still time out, reconnect preserves the result, and agreed restart restores both budgets', async (t) => {
+  const { server, red, seat, advance } = await timedRoom(t);
+  const black = await client(server.port);
+  black.send({ type: 'join', code: seat.code });
+  await black.wait((message) => message.type === 'seat');
+  await red.wait(state(0, (room) => room.clock.started));
+  await black.wait(state(0));
+  advance(1000);
+  red.socket.close();
+  const disconnected = (await black.wait(state(0, (room) => !room.players.red))).room;
+  assert.equal(disconnected.clock.runningSide, 'red');
+  assert.equal(disconnected.clock.remainingMs.red, 5000);
+  advance(5000);
+  const ended = (await black.wait(state(1, (room) => room.game.result))).room;
+  assert.deepEqual(ended.game.result, { winner: 'black', loser: 'red', reason: 'timeout' });
+  const resumed = await client(server.port);
+  resumed.send({ type: 'resume', code: seat.code, token: seat.token });
+  await resumed.wait((message) => message.type === 'seat');
+  assert.deepEqual((await resumed.wait(state(1))).room.game.result, ended.game.result);
+  await black.wait(state(1, (room) => room.players.red));
+  resumed.send({ type: 'restart-request' });
+  await black.wait(state(1, (room) => room.pendingRestart === 'red'));
+  black.send({ type: 'restart-answer', accept: true });
+  const restarted = (await resumed.wait(state(2))).room;
+  assert.equal(restarted.game.result, null);
+  assert.equal(restarted.game.history.length, 0);
+  assert.deepEqual(restarted.clock.remainingMs, { red: 6000, black: 900_000 });
+  assert.equal(restarted.clock.runningSide, 'red');
+});
+
+test('restart requests do not pause play or time and a connected player can finish a turn while the opponent is offline', async (t) => {
+  const { server, red, seat, advance } = await timedRoom(t);
+  const black = await client(server.port);
+  black.send({ type: 'join', code: seat.code });
+  await black.wait((message) => message.type === 'seat');
+  await red.wait(state(0, (room) => room.clock.started));
+  await black.wait(state(0));
+  red.send({ type: 'restart-request' });
+  await black.wait(state(0, (room) => room.pendingRestart));
+  advance(1000);
+  black.socket.close();
+  await red.wait(state(0, (room) => !room.players.black));
+  red.send({ type: 'move', from: { x: 0, y: 6 }, to: { x: 0, y: 5 }, revision: 0 });
+  const moved = (await red.wait(state(1))).room;
+  assert.equal(moved.clock.remainingMs.red, 5000);
+  assert.equal(moved.clock.runningSide, 'black');
+  assert.equal(moved.pendingRestart, 'red');
+  advance(900_000);
+  assert.equal((await red.wait(state(2, (room) => room.game.result))).room.game.result.loser, 'black');
+});
+
+test('invalid room times cannot create a seat and a joiner cannot change the host settings', async (t) => {
+  const server = await startServer({ port: 0, host: '127.0.0.1' });
+  t.after(() => server.close());
+  const red = await client(server.port);
+  for (const timeControl of [null, {}, { red: 0, black: 900_000 }, { red: '600000', black: 900_000 }]) {
+    red.send({ type: 'create', timeControl });
+    assert.match((await red.wait(error)).error, /总时间/);
+  }
+  red.send({ type: 'create', timeControl: { red: 600_000, black: 900_000 } });
+  await red.wait((message) => message.type === 'seat');
+  assert.deepEqual((await red.wait(state(0))).room.clock.initialMs, { red: 600_000, black: 900_000 });
+});
+
+test('a real checkmate from the starting position synchronizes the winner, stops both clocks and locks play', async (t) => {
+  const { server, red, seat, advance } = await timedRoom(t, { red: 600_000, black: 900_000 });
+  const black = await client(server.port);
+  black.send({ type: 'join', code: seat.code });
+  await black.wait((message) => message.type === 'seat');
+  await red.wait(state(0, (room) => room.clock.started));
+  await black.wait(state(0));
+  const moves = [[4, 6, 4, 5], [4, 3, 4, 4], [3, 9, 4, 8], [4, 4, 4, 5], [1, 7, 4, 7],
+    [4, 5, 3, 5], [4, 7, 4, 2], [3, 5, 2, 5], [7, 7, 4, 7]];
+  let latest;
+  for (const [revision, [x, y, tx, ty]] of moves.entries()) {
+    advance(100);
+    const player = revision % 2 ? black : red;
+    player.send({ type: 'move', from: { x, y }, to: { x: tx, y: ty }, revision });
+    latest = (await red.wait(state(revision + 1))).room;
+    assert.deepEqual((await black.wait(state(revision + 1))).room, latest);
+    if (revision < moves.length - 1) assert.equal(latest.game.result, null);
+  }
+  assert.deepEqual(latest.game.result, { winner: 'red', loser: 'black', reason: 'checkmate' });
+  assert.equal(latest.clock.runningSide, null);
+  assert.deepEqual(latest.clock.remainingMs, { red: 599_500, black: 899_600 });
+  advance(50_000);
+  black.send({ type: 'move', from: { x: 0, y: 3 }, to: { x: 0, y: 4 }, revision: moves.length });
+  assert.match((await black.wait(error)).error, /结束/);
+  red.send({ type: 'restart-request' });
+  const stopped = (await red.wait(state(moves.length, (room) => room.pendingRestart))).room;
+  assert.deepEqual(stopped.clock.remainingMs, latest.clock.remainingMs);
+});

@@ -21,7 +21,7 @@ export function createInitialGame() {
     for (const x of [1, 7]) board[indexOf({ x, y: side === 'red' ? 7 : 2 })] = { side, type: 'cannon' };
     for (const x of [0, 2, 4, 6, 8]) board[indexOf({ x, y: side === 'red' ? 6 : 3 })] = { side, type: 'pawn' };
   }
-  return { board, turn: 'red', history: [] };
+  return { board, turn: 'red', history: [], result: null };
 }
 
 function inPalace(side, { x, y }) {
@@ -99,6 +99,7 @@ function movedBoard(board, from, to) {
 }
 
 export function validateMove(game, from, to) {
+  if (game.result) return { ok: false, error: '棋局已经结束，请重新开始或悔棋' };
   if (!insideBoard(from) || !insideBoard(to)) return { ok: false, error: '位置必须是棋盘内的交叉点' };
   if (from.x === to.x && from.y === to.y) return { ok: false, error: '请选择另一个落点' };
   const piece = pieceAt(game.board, from);
@@ -113,26 +114,130 @@ export function validateMove(game, from, to) {
   return { ok: true };
 }
 
+function candidateDestinations(board, from) {
+  const piece = pieceAt(board, from);
+  if (!piece) return [];
+  const destinations = [];
+  const seen = new Set();
+  const add = (x, y) => {
+    const to = { x, y };
+    if (!insideBoard(to) || pieceAt(board, to)?.side === piece.side || seen.has(indexOf(to))) return;
+    seen.add(indexOf(to));
+    destinations.push(to);
+  };
+  const straight = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  switch (piece.type) {
+    case 'rook':
+    case 'cannon':
+      for (const [dx, dy] of straight) {
+        let screened = false;
+        for (let x = from.x + dx, y = from.y + dy; insideBoard({ x, y }); x += dx, y += dy) {
+          const target = pieceAt(board, { x, y });
+          if (piece.type === 'rook') {
+            add(x, y);
+            if (target) break;
+          } else if (!screened) {
+            if (target) screened = true;
+            else add(x, y);
+          } else if (target) {
+            add(x, y);
+            break;
+          }
+        }
+      }
+      break;
+    case 'horse':
+      for (const [dx, dy] of [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [-1, 2], [1, -2], [-1, -2]]) {
+        const leg = Math.abs(dx) === 2 ? { x: from.x + Math.sign(dx), y: from.y }
+          : { x: from.x, y: from.y + Math.sign(dy) };
+        if (!pieceAt(board, leg)) add(from.x + dx, from.y + dy);
+      }
+      break;
+    case 'elephant':
+      for (const dx of [-2, 2]) for (const dy of [-2, 2]) {
+        const to = { x: from.x + dx, y: from.y + dy };
+        if ((piece.side === 'red' ? to.y >= 5 : to.y <= 4)
+          && !pieceAt(board, { x: from.x + dx / 2, y: from.y + dy / 2 })) add(to.x, to.y);
+      }
+      break;
+    case 'advisor':
+      for (const dx of [-1, 1]) for (const dy of [-1, 1]) {
+        const to = { x: from.x + dx, y: from.y + dy };
+        if (inPalace(piece.side, to)) add(to.x, to.y);
+      }
+      break;
+    case 'general':
+      for (const [dx, dy] of straight) {
+        const to = { x: from.x + dx, y: from.y + dy };
+        if (inPalace(piece.side, to)) add(to.x, to.y);
+      }
+      // A flying-general capture can span the board and lies outside its own palace.
+      for (const dy of [-1, 1]) {
+        for (let y = from.y + dy; y >= 0 && y < ROWS; y += dy) {
+          const target = pieceAt(board, { x: from.x, y });
+          if (target) {
+            if (target.type === 'general') add(from.x, y);
+            break;
+          }
+        }
+      }
+      break;
+    case 'pawn':
+      add(from.x, from.y + (piece.side === 'red' ? -1 : 1));
+      if (piece.side === 'red' ? from.y <= 4 : from.y >= 5) {
+        add(from.x - 1, from.y);
+        add(from.x + 1, from.y);
+      }
+      break;
+  }
+  return destinations;
+}
+
 export function legalMoves(game, from) {
+  if (game.result) return [];
   if (!insideBoard(from) || pieceAt(game.board, from)?.side !== game.turn) return [];
-  const moves = [];
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
-      if (validateMove(game, from, { x, y }).ok) moves.push({ x, y });
+  return candidateDestinations(game.board, from)
+    .filter((to) => validateMove(game, from, to).ok)
+    .sort((a, b) => indexOf(a) - indexOf(b));
+}
+
+export function getGameResult(game) {
+  const sides = [game.turn, otherSide(game.turn)];
+  const missingGeneral = sides.find((side) => !game.board.some(
+    (piece) => piece?.side === side && piece.type === 'general',
+  ));
+  if (missingGeneral) {
+    return { winner: otherSide(missingGeneral), loser: missingGeneral, reason: 'general-captured' };
+  }
+
+  // Recompute from the position, even when the caller already has a saved result.
+  const activeGame = { ...game, result: null };
+  for (let index = 0; index < game.board.length; index++) {
+    if (game.board[index]?.side !== game.turn) continue;
+    const from = { x: index % COLS, y: Math.floor(index / COLS) };
+    for (const to of candidateDestinations(game.board, from)) {
+      if (validateMove(activeGame, from, to).ok) return null;
     }
   }
-  return moves;
+  return {
+    winner: otherSide(game.turn),
+    loser: game.turn,
+    reason: isInCheck(game.board, game.turn) ? 'checkmate' : 'stalemate',
+  };
 }
 
 export function applyMove(game, from, to) {
-  const result = validateMove(game, from, to);
-  if (!result.ok) return result;
+  const validation = validateMove(game, from, to);
+  if (!validation.ok) return validation;
   const move = { from: { ...from }, to: { ...to }, piece: pieceAt(game.board, from), captured: pieceAt(game.board, to) };
-  return { ok: true, game: {
+  const nextGame = {
     board: movedBoard(game.board, from, to),
     turn: otherSide(game.turn),
     history: [...game.history, move],
-  } };
+    result: null,
+  };
+  nextGame.result = getGameResult(nextGame);
+  return { ok: true, game: nextGame };
 }
 
 export function undoMove(game) {
@@ -141,5 +246,5 @@ export function undoMove(game) {
   const board = game.board.slice();
   board[indexOf(move.from)] = move.piece;
   board[indexOf(move.to)] = move.captured;
-  return { board, turn: move.piece.side, history: game.history.slice(0, -1) };
+  return { board, turn: move.piece.side, history: game.history.slice(0, -1), result: null };
 }

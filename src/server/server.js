@@ -20,7 +20,7 @@ export function lanAddresses(port) {
     .map((address) => `http://${address.address}:${port}`);
 }
 
-export async function startServer({ port = 3000, host = '0.0.0.0' } = {}) {
+export async function startServer({ port = 3000, host = '0.0.0.0', roomOptions } = {}) {
   const server = createServer(async (request, response) => {
     response.setHeader('X-Content-Type-Options', 'nosniff');
     response.setHeader('Cache-Control', 'no-store');
@@ -52,7 +52,7 @@ export async function startServer({ port = 3000, host = '0.0.0.0' } = {}) {
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
   // ws forwards HTTP listen errors; handle them so our startup promise can reject.
   wss.on('error', () => {});
-  attachRooms(wss);
+  attachRooms(wss, roomOptions);
   try {
     await new Promise((resolve, reject) => {
       server.once('error', reject);

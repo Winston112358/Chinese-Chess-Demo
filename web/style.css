@@ -8,12 +8,12 @@ h1 small { font-size: 14px; font-weight: normal; color: #666; }
 h2 { margin: 0 0 12px; font-size: 17px; }
 p { line-height: 1.6; }
 header p { margin: 0 0 16px; color: #666; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { cursor: pointer; border: 1px solid #bbb; border-radius: 4px; padding: 7px 12px; background: white; }
 button:hover:not(:disabled) { background: #eee; }
 button:disabled { opacity: .45; cursor: default; }
-button:focus-visible, input:focus-visible { outline: 3px solid #167fc0; outline-offset: 2px; }
-input { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius: 4px; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #167fc0; outline-offset: 2px; }
+input, select { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius: 4px; background: white; }
 [hidden] { display: none !important; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar strong { margin-right: 6px; }
@@ -21,6 +21,15 @@ input { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius: 4px; }
 .turn.red { color: #a32020; }
 .message { min-height: 26px; margin: 5px 0 12px; color: #444; }
 .message.error { color: #a32020; }
+.game-result { margin: 0 0 16px; padding: 12px 16px; border: 1px solid #b78025; border-radius: 4px; background: #fff4d8; font-weight: bold; }
+.clock-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 540px; margin-bottom: 12px; }
+.clock { border: 1px solid #bbb; border-radius: 4px; background: white; padding: 8px 12px; }
+.clock span { display: block; font-size: 13px; }
+.clock.red span { color: #a32020; }
+.clock time { display: block; margin-top: 2px; font-size: 28px; line-height: 1.2; font-variant-numeric: tabular-nums; font-weight: bold; }
+.clock.running { border-color: #b78025; background: #fff4d8; box-shadow: inset 0 0 0 1px #b78025; }
+.clock.low time { color: #a32020; }
+.clock-panel p { grid-column: 1 / -1; margin: 0; }
 .game-layout { display: grid; grid-template-columns: minmax(0, 540px) minmax(260px, 1fr); gap: 24px; align-items: start; }
 .board { width: 100%; max-width: 540px; aspect-ratio: 9 / 10; position: relative; background: #f0dfbe; border: 1px solid #997d50; user-select: none; font-family: var(--chess-font); container-type: inline-size; }
 .board svg { width: 100%; height: 100%; display: block; pointer-events: none; }
@@ -44,6 +53,12 @@ input { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius: 4px; }
 .panel p { margin: 10px 0; font-size: 14px; }
 .panel label { display: block; margin-bottom: 6px; font-size: 14px; }
 .room-controls { display: grid; gap: 8px; margin-top: 10px; }
+.time-settings { min-width: 0; margin: 0; padding: 10px; border: 1px solid #bbb; border-radius: 4px; }
+.time-settings legend { padding: 0 4px; font-size: 13px; }
+.time-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.panel label.custom-time { margin: 8px 0 0; font-size: 12px; }
+.custom-time input { margin-top: 4px; }
+.panel .time-settings .hint { margin-bottom: 0; font-size: 12px; }
 #room-code { text-transform: uppercase; }
 #network-status { white-space: pre-line; font-weight: bold; }
 .hint { font-size: 12px; color: #666; }

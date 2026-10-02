@@ -11,7 +11,7 @@
 <body>
   <main>
     <header>
-      <h1>中国象棋 <small>试玩版 v0.1.3</small></h1>
+      <h1>中国象棋 <small>试玩版 v0.2.0</small></h1>
       <p>同机双人或局域网对弈 · 红方先行</p>
     </header>
     <div class="toolbar">
@@ -23,8 +23,21 @@
     </div>
     <p id="turn" class="turn" aria-live="polite"></p>
     <p id="message" class="message" role="status">悬停红光提示可选棋子，点击拿起，再点击落点；落子前可换选其他棋子。</p>
+    <p id="game-result" class="game-result" role="status" hidden></p>
     <div class="game-layout">
       <section aria-label="象棋对局">
+        <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
+          <div id="clock-red" class="clock red">
+            <span>红方剩余</span>
+            <time id="time-red">10:00</time>
+          </div>
+          <div id="clock-black" class="clock black">
+            <span>黑方剩余</span>
+            <time id="time-black">10:00</time>
+          </div>
+          <p id="time-control-summary" class="hint"></p>
+          <p id="clock-info" class="hint"></p>
+        </div>
         <div id="board" class="board" role="group" aria-label="象棋棋盘"></div>
         <p class="hint">棋子位于交叉点。已走的最后一步以虚线标记。</p>
       </section>
@@ -34,6 +47,34 @@
           <label for="server">房主的服务器地址</label>
           <input id="server" type="url" placeholder="http://192.168.1.100:3000" autocomplete="off">
           <div class="room-controls">
+            <fieldset id="time-settings" class="time-settings">
+              <legend>房主建房前设置每方总时间</legend>
+              <div class="time-options">
+                <div>
+                  <label for="red-time-choice">红方</label>
+                  <select id="red-time-choice">
+                    <option value="10">10 分钟</option>
+                    <option value="15">15 分钟</option>
+                    <option value="custom">自定义分钟</option>
+                  </select>
+                  <label id="red-custom-label" class="custom-time" for="red-time-custom" hidden>红方分钟数
+                    <input id="red-time-custom" type="number" min="0.1" max="180" step="0.01" value="10" inputmode="decimal">
+                  </label>
+                </div>
+                <div>
+                  <label for="black-time-choice">黑方</label>
+                  <select id="black-time-choice">
+                    <option value="10">10 分钟</option>
+                    <option value="15">15 分钟</option>
+                    <option value="custom">自定义分钟</option>
+                  </select>
+                  <label id="black-custom-label" class="custom-time" for="black-time-custom" hidden>黑方分钟数
+                    <input id="black-time-custom" type="number" min="0.1" max="180" step="0.01" value="10" inputmode="decimal">
+                  </label>
+                </div>
+              </div>
+              <p class="hint">自定义 0.1–180 分钟，最多两位小数。好友加入后开钟；走棋消耗己方总时间，断线不停钟。</p>
+            </fieldset>
             <button id="create">创建房间（红方）</button>
             <input id="room-code" aria-label="房间码" placeholder="6 位房间码" maxlength="6" autocomplete="off">
             <button id="join">加入房间（黑方）</button>
@@ -41,7 +82,7 @@
           </div>
           <p id="network-status" aria-live="polite">创建房间后，把地址和房间码告诉好友。</p>
           <div id="restart-request" hidden>
-            <p>对手请求重新开局，是否同意？</p>
+            <p>对手请求重新开局。双方同意后重置棋局与时间；回应前仍可走棋，计时继续。</p>
             <button id="accept">同意</button>
             <button id="decline">拒绝</button>
           </div>
@@ -59,7 +100,8 @@
         <section class="panel">
           <h2>首版说明</h2>
           <p>已限制棋子的走法、吃子、将帅照面和自陷将军，并提示将军。</p>
-          <p>暂不自动裁定将死、困毙或和棋。对局结束由双方确认后重新开局。暂不提供 AI、计时或长将长捉裁定。</p>
+          <p>自动裁定将死、困毙、将帅被吃和联机超时，结束后停止落子。局域网双方同意后可重新开局，沿用本房间时限。</p>
+          <p>暂不提供 AI、自动和棋或长将长捉裁定。同机双人不计时。</p>
         </section>
       </aside>
     </div>
