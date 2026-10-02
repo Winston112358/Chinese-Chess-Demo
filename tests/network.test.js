@@ -31,6 +31,16 @@ async function client(port) {
 const state = (revision, extra = () => true) => (message) => message.type === 'state' && message.room.revision === revision && extra(message.room);
 const error = (message) => message.type === 'error';
 
+test('occupied ports reject cleanly and the caller can retry on an available port', async (t) => {
+  const first = await startServer({ port: 0, host: '127.0.0.1' });
+  t.after(() => first.close());
+  await assert.rejects(startServer({ port: first.port, host: '127.0.0.1' }), { code: 'EADDRINUSE' });
+  const fallback = await startServer({ port: 0, host: '127.0.0.1' });
+  t.after(() => fallback.close());
+  assert.notEqual(fallback.port, first.port);
+  assert.equal((await fetch(`http://127.0.0.1:${fallback.port}/`)).status, 200);
+});
+
 test('HTTP serves only app assets and reports LAN addresses', async (t) => {
   const server = await startServer({ port: 0, host: '127.0.0.1' });
   t.after(() => server.close());

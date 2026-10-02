@@ -49,11 +49,18 @@ export async function startServer({ port = 3000, host = '0.0.0.0' } = {}) {
     }
   });
   const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
+  // ws forwards HTTP listen errors; handle them so our startup promise can reject.
+  wss.on('error', () => {});
   attachRooms(wss);
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, host, () => { server.removeListener('error', reject); resolve(); });
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, host, () => { server.removeListener('error', reject); resolve(); });
+    });
+  } catch (error) {
+    wss.close();
+    throw error;
+  }
   return {
     port: server.address().port,
     close: () => new Promise((resolve, reject) => {
