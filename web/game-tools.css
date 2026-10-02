@@ -48,14 +48,13 @@
 .captured-piece.black { color: var(--piece-black, #202020); }
 .capture-empty { color: #79766f; font-size: 12px; }
 
-/* The separate blue ring and diamond leave move marks and the lifted shadow intact. */
+/* The separate blue ring leaves move marks and the lifted shadow intact. */
 .point.piece.danger::before {
   content: '';
   position: absolute;
   inset: -8px;
   border: 2px dashed #4265c9;
   border-radius: 50%;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 0L12 6L6 12L0 6Z' fill='%234265c9' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") top right / 12px 12px no-repeat;
   pointer-events: none;
 }
 
