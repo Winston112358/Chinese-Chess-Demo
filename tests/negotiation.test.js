@@ -123,26 +123,53 @@ test('refusal keeps the board and does not pause either clock', async (t) => {
   assert.equal(declined.clock.runningSide, 'red');
 });
 
-test('a real move cancels negotiation and old request IDs or revisions cannot modify a new request', async (t) => {
-  const { red, connectBlack } = await setup(t);
-  const { black } = await connectBlack();
-  await move(red, black, red, 0, [0, 6, 0, 5]);
-  const old = (await request(red, black, red, 'undo', 1)).pendingAction;
-  const moved = await move(red, black, black, 1, [0, 3, 0, 4]);
-  assert.equal(moved.pendingAction, null);
-  red.send({ type: 'action-answer', requestId: old.id, accept: true });
-  assert.match((await red.wait(error)).error, /失效/);
-  red.send({ type: 'action-request', action: 'undo', revision: 1 });
-  assert.deepEqual((await red.wait(state(2))).room.game, moved.game);
-  assert.match((await red.wait(error)).error, /更新/);
-  const fresh = (await request(red, black, red, 'draw', 2)).pendingAction;
-  assert.notEqual(fresh.id, old.id);
-  black.send({ type: 'action-answer', requestId: old.id, accept: true });
-  assert.match((await black.wait(error)).error, /失效/);
-  const ended = await answer(red, black, black, fresh, true, 3);
-  assert.deepEqual(ended.game.result, { winner: null, loser: null, reason: 'draw' });
-  assert.equal(ended.game.history.length, 2);
-});
+for (const action of ['undo', 'draw', 'resign']) for (const requesterSide of ['red', 'black']) {
+  test(`${action} vote by ${requesterSide} locks both clients until a valid response, with clocks running`, async (t) => {
+    const { red, connectBlack, advance } = await setup(t);
+    const { black } = await connectBlack();
+    const current = await move(red, black, red, 0, [0, 6, 0, 5]);
+    const requester = requesterSide === 'red' ? red : black;
+    const responder = requesterSide === 'red' ? black : red;
+    advance(100);
+    const old = (await request(red, black, requester, action, 1)).pendingAction;
+    const attemptMove = async (player, from, to, revision = 1) => {
+      player.send({ type: 'move', from, to, revision });
+      assert.match((await player.wait(error)).error, /投票/);
+    };
+    await attemptMove(red, { x: 0, y: 5 }, { x: 0, y: 4 });
+    await attemptMove(black, { x: 0, y: 3 }, { x: 0, y: 4 });
+    advance(200);
+    requester.send({ type: 'action-answer', requestId: old.id, accept: false });
+    assert.match((await requester.wait(error)).error, /回应/);
+    responder.send({ type: 'action-answer', requestId: old.id, accept: 'false' });
+    assert.match((await responder.wait(error)).error, /格式/);
+    await attemptMove(black, { x: 0, y: 3 }, { x: 0, y: 4 });
+    // A stale request returns the authoritative snapshot without unlocking the vote.
+    requester.send({ type: 'action-request', action, revision: 0 });
+    const locked = (await requester.wait(state(1))).room;
+    assert.match((await requester.wait(error)).error, /更新/);
+    assert.deepEqual(locked.game, current.game);
+    assert.deepEqual(locked.pendingAction, old);
+    assert.equal(locked.clock.runningSide, 'black');
+    assert.deepEqual(locked.clock.remainingMs, { red: 6000, black: 8700 });
+    advance(300);
+    const declined = await answer(red, black, responder, old, false, 1);
+    assert.deepEqual(declined.game, current.game);
+    assert.equal(declined.pendingAction, null);
+    const moved = await move(red, black, black, 1, [0, 3, 0, 4]);
+    assert.equal(moved.game.history.length, 2);
+    assert.deepEqual(moved.clock.remainingMs, { red: 6000, black: 8400 });
+    const fresh = (await request(red, black, requester, action, 2)).pendingAction;
+    assert.notEqual(fresh.id, old.id);
+    responder.send({ type: 'action-answer', requestId: old.id, accept: true });
+    assert.match((await responder.wait(error)).error, /失效/);
+    await attemptMove(red, { x: 0, y: 5 }, { x: 0, y: 4 }, 2);
+    const released = await answer(red, black, responder, fresh, false, 2);
+    assert.deepEqual(released.game, moved.game);
+    const resumed = await move(red, black, red, 2, [0, 5, 0, 4]);
+    assert.equal(resumed.game.history.length, 3);
+  });
+}
 
 test('single-step undo restores a captured piece, alternates turns and keeps all elapsed time', async (t) => {
   const { red, connectBlack, advance } = await setup(t);

@@ -1,6 +1,6 @@
 {
   "name": "chinese-chess-demo",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "中国象棋：网页、Windows 客户端与局域网对弈",
   "private": true,
   "author": "Winston112358",

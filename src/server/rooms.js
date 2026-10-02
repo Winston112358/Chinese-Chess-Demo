@@ -87,6 +87,7 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
     if (message.type === 'move') {
       if (room.game.result) return fail(socket, '本局已结束，请双方同意后重新开局');
       if (!room.clock.started) return fail(socket, '等待双方连接后再操作');
+      if (room.pendingAction || room.pendingRestart) return fail(socket, '等待投票回应，请先同意或拒绝请求后再走棋；计时继续');
       if (room.game.turn !== side) return fail(socket, '还没有轮到你');
       if (message.revision !== room.revision) {
         send(socket, { type: 'state', room: snapshot(room, now()) });

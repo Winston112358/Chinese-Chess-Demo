@@ -211,7 +211,7 @@ test('idle and disconnected players still time out, reconnect preserves the resu
   assert.equal(restarted.clock.runningSide, 'red');
 });
 
-test('restart requests do not pause play or time and a connected player can finish a turn while the opponent is offline', async (t) => {
+test('restart voting locks both clients without pausing clocks; refusal restores play and offline clocks still run', async (t) => {
   const { server, red, seat, advance } = await timedRoom(t);
   const black = await client(server.port);
   black.send({ type: 'join', code: seat.code });
@@ -219,17 +219,61 @@ test('restart requests do not pause play or time and a connected player can fini
   await red.wait(state(0, (room) => room.clock.started));
   await black.wait(state(0));
   red.send({ type: 'restart-request' });
-  await black.wait(state(0, (room) => room.pendingRestart));
+  await red.wait(state(0, (room) => room.pendingRestart === 'red'));
+  await black.wait(state(0, (room) => room.pendingRestart === 'red'));
   advance(1000);
-  black.socket.close();
-  await red.wait(state(0, (room) => !room.players.black));
+  for (const [player, from, to] of [
+    [red, { x: 0, y: 6 }, { x: 0, y: 5 }], [black, { x: 0, y: 3 }, { x: 0, y: 4 }],
+  ]) {
+    player.send({ type: 'move', from, to, revision: 0 });
+    assert.match((await player.wait(error)).error, /投票/);
+  }
+  red.send({ type: 'restart-answer', accept: false });
+  assert.match((await red.wait(error)).error, /回应/);
+  black.send({ type: 'restart-answer', accept: 'false' });
+  assert.match((await black.wait(error)).error, /格式/);
+  red.send({ type: 'move', from: { x: 0, y: 6 }, to: { x: 0, y: 5 }, revision: 0 });
+  assert.match((await red.wait(error)).error, /投票/);
+  black.send({ type: 'restart-answer', accept: false });
+  const declined = (await red.wait(state(0, (room) => !room.pendingRestart))).room;
+  assert.deepEqual((await black.wait(state(0, (room) => !room.pendingRestart))).room, declined);
+  assert.equal(declined.game.history.length, 0);
+  assert.deepEqual(declined.clock.remainingMs, { red: 5000, black: 900_000 });
+  assert.equal(declined.clock.runningSide, 'red');
   red.send({ type: 'move', from: { x: 0, y: 6 }, to: { x: 0, y: 5 }, revision: 0 });
   const moved = (await red.wait(state(1))).room;
+  await black.wait(state(1));
   assert.equal(moved.clock.remainingMs.red, 5000);
   assert.equal(moved.clock.runningSide, 'black');
-  assert.equal(moved.pendingRestart, 'red');
-  advance(900_000);
-  assert.equal((await red.wait(state(2, (room) => room.game.result))).room.game.result.loser, 'black');
+  assert.equal(moved.pendingRestart, null);
+  black.send({ type: 'restart-request' });
+  await red.wait(state(1, (room) => room.pendingRestart === 'black'));
+  await black.wait(state(1, (room) => room.pendingRestart === 'black'));
+  advance(500);
+  for (const [player, from, to] of [
+    [red, { x: 0, y: 5 }, { x: 0, y: 4 }], [black, { x: 0, y: 3 }, { x: 0, y: 4 }],
+  ]) {
+    player.send({ type: 'move', from, to, revision: 1 });
+    assert.match((await player.wait(error)).error, /投票/);
+  }
+  red.send({ type: 'restart-answer', accept: false });
+  const secondDecline = (await red.wait(state(1, (room) => !room.pendingRestart))).room;
+  await black.wait(state(1, (room) => !room.pendingRestart));
+  assert.equal(secondDecline.game.history.length, 1);
+  assert.deepEqual(secondDecline.clock.remainingMs, { red: 5000, black: 899_500 });
+  black.send({ type: 'move', from: { x: 0, y: 3 }, to: { x: 0, y: 4 }, revision: 1 });
+  await red.wait(state(2));
+  await black.wait(state(2));
+  black.socket.close();
+  await red.wait(state(2, (room) => !room.players.black));
+  advance(500);
+  red.send({ type: 'move', from: { x: 0, y: 5 }, to: { x: 0, y: 4 }, revision: 2 });
+  const offlineMove = (await red.wait(state(3))).room;
+  assert.equal(offlineMove.pendingRestart, null);
+  assert.equal(offlineMove.game.history.length, 3);
+  assert.deepEqual(offlineMove.clock.remainingMs, { red: 4500, black: 899_500 });
+  advance(899_500);
+  assert.equal((await red.wait(state(4, (room) => room.game.result))).room.game.result.loser, 'black');
 });
 
 test('invalid room times cannot create a seat and a joiner cannot change the host settings', async (t) => {

@@ -98,7 +98,7 @@ function renderVote() {
   };
   $('vote-description').textContent = explanation[request.action];
   $('vote-wait').hidden = !own;
-  $('vote-wait').textContent = game.result ? '等待对手投票；本局计时已停止。' : '等待对手投票；真实棋局与计时继续。';
+  $('vote-wait').textContent = game.result ? '等待对手投票；本局计时已停止。' : '等待对手投票；暂不可落子，计时继续。';
   $('vote-buttons').hidden = own;
   $('accept').disabled = $('decline').disabled = actionSending || connecting
     || socket?.readyState !== WebSocket.OPEN || !room.players.red || !room.players.black;
@@ -125,6 +125,7 @@ function render() {
     ? `沙盘 · ${view.result ? '推演结束' : `${SIDE_NAMES[view.turn]}走棋`} · 已推演 ${view.history.length} 步`
     : game.result ? `对局结束 · 已走 ${game.history.length} 步` : `${SIDE_NAMES[game.turn]}走棋 · 已走 ${game.history.length} 步${isInCheck(game.board, game.turn) ? ' · 将军！请应将' : ''}`;
   $('turn').className = `turn ${view.result?.winner || view.turn}`;
+  if (!sandbox && request && !game.result) $('turn').textContent += ' · 等待投票';
   $('game-result').hidden = !game.result;
   $('game-result').textContent = game.result ? resultDescription(game.result) : '';
   const undoable = !game.result || ['checkmate', 'stalemate', 'general-captured'].includes(game.result.reason);
@@ -140,7 +141,9 @@ function render() {
   $('sandbox-banner').hidden = !sandbox;
   $('board').classList.toggle('sandbox-board', Boolean(sandbox));
   if (sandbox) {
-    const real = game.result ? resultDescription(game.result) : `真实棋局：${SIDE_NAMES[game.turn]}走棋，计时继续。`;
+    const real = game.result ? resultDescription(game.result) : request
+      ? `真实棋局：等待投票，${SIDE_NAMES[game.turn]}计时中。`
+      : `真实棋局：${SIDE_NAMES[game.turn]}走棋，计时继续。`;
     const analysis = view.result ? `推演结果：${resultDescription(view.result)}` : `${SIDE_NAMES[view.turn]}走棋${isInCheck(view.board, view.turn) ? ' · 将军' : ''}。`;
     $('sandbox-banner').textContent = `沙盘模式 · ${analysis} ${real}`;
   }
@@ -159,6 +162,7 @@ function render() {
     if (!connected) status = `连接已断开，请恢复房间${room.clock?.started && !game.result ? '；计时继续' : ''}`;
     else if (game.result) status = `对局已结束${bothOnline ? '，可双方同意重新开局' : '，等待对手重连后重新开局'}`;
     else if (!room.clock?.started) status = '等待好友首次连接；尚未开钟，不能落子';
+    else if (request) status = `等待投票，暂不可落子；计时继续${bothOnline ? '' : '，等待对手重连'}`;
     else status = bothOnline ? '双方已连接，可以对弈' : '对手已断线；计时继续，你仍可在己方回合落子';
     $('network-status').textContent = `房间码：${room.code}\n${status}${request?.side === side ? `\n已请求${ACTION_NAMES[request.action]}，等待对手回应` : ''}`;
     $('resume').hidden = connected;
@@ -166,7 +170,7 @@ function render() {
   renderClocks();
   renderBoard($('board'), {
     game: view, selected, flipped,
-    canSelect: !view.result && (sandbox ? true : ready && !connecting && !movePending && (!room || game.turn === side)),
+    canSelect: !view.result && (sandbox ? true : ready && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side)),
     moves: selected ? legalMoves(view, selected) : [],
     danger: dangerPoints(view),
     onClick: clickPoint,
@@ -209,6 +213,7 @@ function clickPoint(point) {
   }
   if (connecting || movePending) return notify('请等待服务器回应', true);
   if (game.result) return notify(`对局已结束。${resultDescription(game.result)}`, true);
+  if (room && (pendingVote() || actionSending)) return notify('请先完成投票，再继续走棋', true);
   if (room && socket?.readyState !== WebSocket.OPEN) return notify('连接已断开，请恢复房间后落子；计时继续', true);
   if (room && !room.clock?.started) return notify('等待好友首次连接后开钟落子', true);
   if (room && game.turn !== side) return notify('现在是对手的回合', true);
@@ -302,15 +307,15 @@ function connect(action, address = $('server').value.trim()) {
       }
       if (sandbox && game.result) sandbox = null;
       if (positionChanged || resultChanged) movePending = false;
-      if (positionChanged || game.result || (!sandbox && (!room.clock?.started || game.turn !== side))) selected = null;
+      if (positionChanged || game.result || (!sandbox && (!room.clock?.started || game.turn !== side || pendingVote()))) selected = null;
       if (game.result) notify(resultDescription(game.result));
       else if (sandboxRebased) notify('真实棋局已更新，沙盘推演已重置');
       else if (positionChanged) notify(room.clock?.started ? (wasMovePending ? '落子成功，轮到对方' : '棋盘已同步，按回合落子') : '等待好友加入房间，尚未开钟');
       else if (previous?.pendingAction && !room.pendingAction) notify('协商已处理，继续正常对局');
       else if (previous.players.red !== room.players.red || previous.players.black !== room.players.black) {
-        notify(room.players.red && room.players.black ? '双方已连接，按回合落子' : (room.clock?.started ? '对手已断线；计时继续，己方回合仍可落子' : '等待好友加入房间，尚未开钟'));
+        notify(pendingVote() ? '等待投票，暂不可落子；计时继续' : room.players.red && room.players.black ? '双方已连接' : (room.clock?.started ? '对手已断线；计时继续，己方回合仍可落子' : '等待好友加入房间，尚未开钟'));
       } else if (previous.pendingRestart !== room.pendingRestart) {
-        notify(room.pendingRestart ? (room.pendingRestart === side ? '已请求重新开局；回应前棋局与计时继续' : '对手请求重新开局；回应前仍可走棋，计时继续') : '重新开局请求已结束，按回合落子');
+        notify(room.pendingRestart ? '等待重新开局投票，暂不可落子；计时继续' : '重新开局请求已结束');
       }
     } else if (message.type === 'error') {
       connecting = false;
@@ -343,7 +348,7 @@ function connect(action, address = $('server').value.trim()) {
 }
 
 $('restart').addEventListener('click', () => {
-  if (room) { actionSending = true; send({ type: 'restart-request' }); render(); return; }
+  if (room) { actionSending = true; if (!sandbox) selected = null; send({ type: 'restart-request' }); render(); return; }
   game = localGame = createInitialGame();
   sandbox = null;
   selected = null;
@@ -363,8 +368,9 @@ $('resign').addEventListener('click', () => requestAction('resign'));
 function requestAction(action) {
   if (!room) return;
   actionSending = true;
+  if (!sandbox) selected = null;
   send({ type: 'action-request', action, revision: room.revision });
-  notify(`已发起${ACTION_NAMES[action]}，等待对手同意；真实对局计时继续`);
+  notify(`已发起${ACTION_NAMES[action]}，等待投票；暂不可落子，计时继续`);
   render();
 }
 $('sandbox-toggle').addEventListener('click', () => {
