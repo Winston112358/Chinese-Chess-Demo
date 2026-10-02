@@ -1,0 +1,179 @@
+.capture-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 540px;
+  min-height: 48px;
+  margin: 8px 0;
+  padding: 7px 10px;
+  border: 1px solid #d7d6d1;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.capture-label {
+  flex: none;
+  color: #55524b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.captured-pieces {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.captured-piece {
+  display: grid;
+  flex: none;
+  place-items: center;
+  place-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+  background: var(--piece-bg, #fff6df);
+  box-shadow: 0 1px 2px #0002;
+  font: 400 24px / 1 var(--chess-font);
+  font-synthesis: none;
+}
+
+.captured-piece.red { color: var(--piece-red, #a32020); }
+.captured-piece.black { color: var(--piece-black, #202020); }
+.capture-empty { color: #79766f; font-size: 12px; }
+
+/* The separate blue ring and diamond leave move marks and the lifted shadow intact. */
+.point.piece.danger::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border: 2px dashed #4265c9;
+  border-radius: 50%;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 0L12 6L6 12L0 6Z' fill='%234265c9' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") top right / 12px 12px no-repeat;
+  pointer-events: none;
+}
+
+.sandbox-banner {
+  max-width: 540px;
+  margin: 12px 0;
+  padding: 11px 13px;
+  border: 1px solid #967cc7;
+  border-radius: 6px;
+  background: #eee5fa;
+  color: #4e2e79;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.sandbox-banner strong { color: #45216f; }
+.board.sandbox-board { outline: 3px solid #967cc7; outline-offset: 2px; }
+.board.sandbox-board::after { content: '沙盘'; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 2px 7px; border: 1px solid #967cc7; border-radius: 4px; background: #eee5fa; color: #4e2e79; font: 600 13px / 1.4 "Microsoft YaHei", system-ui, sans-serif; pointer-events: none; }
+
+.sandbox-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 540px;
+  margin: 0 0 12px;
+}
+
+.sandbox-controls .hint { flex-basis: 100%; margin: 0; }
+
+.play-options {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.play-options label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.play-options input[type='checkbox'] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  padding: 0;
+  accent-color: #5369ad;
+}
+
+.play-options .hint { margin: 0; }
+
+.vote-popup {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 20;
+  width: min(318px, calc(100vw - 24px));
+  height: max-content;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  border: 1px solid #b3bfdc;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 6px 24px #24365729;
+  color: #26334f;
+}
+
+.vote-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid #dce2ee;
+  background: #f0f3fc;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.vote-header:active { cursor: grabbing; }
+.vote-header strong, .vote-header h2, .vote-header h3 { margin: 0; font-size: 14px; }
+.vote-header span { font-size: 11px; font-weight: normal; }
+#vote-buttons { padding: 0 14px 12px; }
+#vote-position { margin: 0 14px 14px; font-size: 12px; }
+.vote-close { flex: none; border: 0; padding: 3px 6px; color: #68758c; background: transparent; }
+.vote-body { padding: 12px 14px; }
+.vote-popup p { margin: 12px 14px; font-size: 14px; line-height: 1.6; }
+.vote-body p { margin: 0 0 10px; }
+.vote-body p:last-child { margin-bottom: 0; }
+
+.vote-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.vote-wait {
+  display: block;
+  margin: 12px 14px;
+  padding: 9px 11px;
+  border-radius: 5px;
+  background: #f1f4fb;
+  color: #5a6680;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .vote-popup { right: 12px; bottom: 12px; }
+}

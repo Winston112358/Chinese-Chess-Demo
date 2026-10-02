@@ -8,24 +8,27 @@
   <link rel="preload" href="/fonts/xiangqi-kai.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/appearance.css">
+  <link rel="stylesheet" href="/game-tools.css">
   <script type="module" src="/appearance.js"></script>
   <script type="module" src="/app.js"></script>
 </head>
 <body>
   <main>
     <header>
-      <h1>中国象棋 <small>试玩版 v0.2.0</small></h1>
+      <h1>中国象棋 <small>试玩版 v0.3.0</small></h1>
       <p>同机双人或局域网对弈 · 红方先行</p>
     </header>
     <div class="toolbar">
       <strong id="mode">同机双人</strong>
       <button id="restart">重新开局</button>
       <button id="undo">悔棋一步</button>
+      <button id="draw" disabled>求和</button>
+      <button id="resign" disabled>认输</button>
       <button id="flip">翻转棋盘</button>
       <button id="local" hidden>返回同机双人</button>
     </div>
     <p id="turn" class="turn" aria-live="polite"></p>
-    <p id="message" class="message" role="status">悬停红光提示可选棋子，点击拿起，再点击落点；落子前可换选其他棋子。</p>
+    <p id="message" class="message" role="status"></p>
     <p id="game-result" class="game-result" role="status" hidden></p>
     <div class="game-layout">
       <section aria-label="象棋对局">
@@ -41,8 +44,19 @@
           <p id="time-control-summary" class="hint"></p>
           <p id="clock-info" class="hint"></p>
         </div>
+        <div class="sandbox-controls toolbar">
+          <button id="sandbox-toggle" aria-pressed="false">进入沙盘</button>
+          <button id="sandbox-undo" hidden>沙盘撤销一步</button>
+        </div>
+        <p id="sandbox-banner" class="sandbox-banner" role="status" hidden></p>
+        <div class="play-options">
+          <label><input id="danger-toggle" type="checkbox">吃子提示</label>
+          <label><input id="captures-toggle" type="checkbox">双方已吃子</label>
+        </div>
+        <p id="danger-legend" class="hint" hidden>蓝紫角标：对手下一步可合法吃到的己方棋子，仅提示当前局面。</p>
+        <div id="captures-top" class="capture-row" hidden></div>
         <div id="board" class="board" data-font="running" data-skin="ivory" role="group" aria-label="象棋棋盘"></div>
-        <p class="hint">棋子位于交叉点。已走的最后一步以虚线标记。</p>
+        <div id="captures-bottom" class="capture-row" hidden></div>
       </section>
       <aside>
         <section class="panel appearance-panel" aria-labelledby="appearance-heading">
@@ -111,11 +125,6 @@
             <button id="resume" hidden>恢复上次房间</button>
           </div>
           <p id="network-status" aria-live="polite">创建房间后，把地址和房间码告诉好友。</p>
-          <div id="restart-request" hidden>
-            <p>对手请求重新开局。双方同意后重置棋局与时间；回应前仍可走棋，计时继续。</p>
-            <button id="accept">同意</button>
-            <button id="decline">拒绝</button>
-          </div>
           <details>
             <summary>本机可分享的局域网地址</summary>
             <ul id="addresses"></ul>
@@ -131,10 +140,20 @@
           <h2>首版说明</h2>
           <p>已限制棋子的走法、吃子、将帅照面和自陷将军，并提示将军。</p>
           <p>自动裁定将死、困毙、将帅被吃和联机超时，结束后停止落子。局域网双方同意后可重新开局，沿用本房间时限。</p>
+          <p>沙盘仅在本机推演，真实对局不停钟；真实棋盘更新后同步沙盘基线。联机悔棋、求和和认输须对手投票同意。</p>
           <p>暂不提供 AI、自动和棋或长将长捉裁定。同机双人不计时。</p>
         </section>
       </aside>
     </div>
   </main>
+  <section id="vote-popup" class="vote-popup" role="dialog" aria-modal="false" aria-labelledby="vote-title" hidden>
+    <div id="vote-header" class="vote-header"><h2 id="vote-title">对局协商</h2><span>拖动标题可移开</span></div>
+    <p id="vote-description" aria-live="polite"></p>
+    <p id="vote-wait" class="vote-wait" hidden>等待对手投票；真实棋局与计时继续。</p>
+    <div id="vote-buttons" class="toolbar">
+      <button id="accept">同意</button><button id="decline">拒绝</button>
+    </div>
+    <button id="vote-position" type="button">移到另一侧</button>
+  </section>
 </body>
 </html>

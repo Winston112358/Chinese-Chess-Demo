@@ -17,7 +17,7 @@ function gridSvg() {
     <g class="board-river" font-size="48" text-anchor="middle"><text x="150" y="314.4">楚 河</text><text x="390" y="314.4">汉 界</text></g></svg>`;
 }
 
-export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick }) {
+export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick, danger = [] }) {
   let buttons = element.querySelectorAll('.point');
   // Keep the nodes so a selection change animates the lift and preserves keyboard focus.
   if (buttons.length !== COLS * ROWS) {
@@ -36,8 +36,10 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
       const point = { x, y };
       const piece = game.board[indexOf(point)];
       const button = buttons[indexOf(point)];
+      const threatened = Boolean(piece && danger.some((target) => samePoint(target, point)));
       const classes = ['point'];
       if (piece) classes.push('piece', piece.side);
+      if (threatened) classes.push('danger');
       if (piece && canSelect && piece.side === game.turn) classes.push('selectable');
       if (samePoint(point, selected)) classes.push('selected');
       if (moves.some((move) => samePoint(move, point))) classes.push('legal');
@@ -57,9 +59,9 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
           glyph.firstElementChild.textContent = PIECE_NAMES[piece.side][piece.type];
         }
       } else button.replaceChildren();
-      button.setAttribute('aria-label', `${name}，第${x + 1}列第${y + 1}行`);
+      button.setAttribute('aria-label', `${name}，第${x + 1}列第${y + 1}行${threatened ? '，有被吃危险' : ''}`);
       button.setAttribute('aria-pressed', String(Boolean(samePoint(point, selected))));
-      button.title = `${name} (${x + 1}, ${y + 1})`;
+      button.title = `${name} (${x + 1}, ${y + 1})${threatened ? '，有被吃危险' : ''}`;
       button.onclick = () => onClick(point);
     }
   }
