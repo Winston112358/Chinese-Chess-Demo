@@ -19,6 +19,8 @@ let clockReceivedAt = 0;
 let sandbox = null;
 let actionSending = false;
 let dangerCache = { board: null, side: null, points: [] };
+let displayedResultKey = '';
+let resultReturnFocus = null;
 const storageKey = 'xiangqi-last-room';
 const ACTION_NAMES = { undo: '单步悔棋', draw: '求和', resign: '认输', restart: '重新开局' };
 
@@ -47,6 +49,52 @@ function resultKey(result) {
   return result ? `${result.winner}:${result.loser}:${result.reason}` : '';
 }
 
+function openResult() {
+  if (!game.result) return;
+  const overlay = $('result-overlay');
+  const alreadyOpen = !overlay.hidden;
+  overlay.hidden = false;
+  $('result-summary').setAttribute('aria-expanded', 'true');
+  if (alreadyOpen || pendingVote() || (!$('vote-popup').hidden && $('vote-popup').contains(document.activeElement))) return;
+  resultReturnFocus = document.activeElement;
+  $('result-dismiss').focus({ preventScroll: true });
+}
+
+function closeResult() {
+  const overlay = $('result-overlay');
+  const restoreFocus = overlay.contains(document.activeElement);
+  overlay.hidden = true;
+  $('result-summary').setAttribute('aria-expanded', 'false');
+  if (restoreFocus) {
+    const visible = (element) => element?.isConnected && !element.disabled
+      && element.matches('button, input, select, textarea, a[href], summary, [tabindex]')
+      && element.getClientRects().length > 0;
+    const request = pendingVote();
+    const voteTarget = request && !$('vote-popup').hidden
+      ? (request.side !== side && !$('accept').disabled ? $('accept') : $('vote-position')) : null;
+    const fallback = $('result-summary').hidden ? $('flip') : $('result-summary');
+    const target = visible(voteTarget) ? voteTarget : visible(resultReturnFocus) ? resultReturnFocus : fallback;
+    target.focus({ preventScroll: true });
+  }
+  resultReturnFocus = null;
+}
+
+function renderResult() {
+  const result = game.result;
+  const key = result ? `${room ? `room:${room.code}` : 'local'}:${resultKey(result)}` : '';
+  $('result-summary').hidden = !result;
+  $('result-summary').textContent = result ? resultDescription(result) : '';
+  $('result-title').textContent = result ? (result.reason === 'draw' ? '和棋' : `${SIDE_NAMES[result.winner]}获胜`) : '';
+  $('game-result').hidden = !result;
+  $('game-result').textContent = result ? resultDescription(result) : '';
+  $('result-overlay').querySelector('.result-card').setAttribute('aria-modal', String(!pendingVote()));
+  if (key !== displayedResultKey) {
+    displayedResultKey = key;
+    if (key) openResult();
+    else closeResult();
+  }
+}
+
 function formatTime(milliseconds) {
   const seconds = Math.ceil(Math.max(0, milliseconds) / 1000);
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
@@ -55,6 +103,7 @@ function formatTime(milliseconds) {
 function renderClocks() {
   const clock = room?.clock;
   $('clock-panel').hidden = !clock;
+  $('clock-details').hidden = !clock;
   if (!clock) return;
   const elapsed = Math.max(0, performance.now() - clockReceivedAt);
   let awaitingResult = false;
@@ -126,8 +175,6 @@ function render() {
     : game.result ? `对局结束 · 已走 ${game.history.length} 步` : `${SIDE_NAMES[game.turn]}走棋 · 已走 ${game.history.length} 步${isInCheck(game.board, game.turn) ? ' · 将军！请应将' : ''}`;
   $('turn').className = `turn ${view.result?.winner || view.turn}`;
   if (!sandbox && request && !game.result) $('turn').textContent += ' · 等待投票';
-  $('game-result').hidden = !game.result;
-  $('game-result').textContent = game.result ? resultDescription(game.result) : '';
   const undoable = !game.result || ['checkmate', 'stalemate', 'general-captured'].includes(game.result.reason);
   $('undo').textContent = room ? '请求单步悔棋' : '悔棋一步';
   $('undo').disabled = !game.history.length || !undoable || connecting || (room && !canNegotiate);
@@ -157,6 +204,7 @@ function render() {
   $('resume').hidden = !savedSeat() || Boolean(room);
   $('resume').disabled = connecting;
   renderVote();
+  renderResult();
   if (room) {
     let status;
     if (!connected) status = `连接已断开，请恢复房间${room.clock?.started && !game.result ? '；计时继续' : ''}`;
@@ -284,8 +332,9 @@ function connect(action, address = $('server').value.trim()) {
     clearTimeout(connectionTimer);
     if (message.type === 'seat') {
       assigned = true;
+      const sameSeat = room?.code === message.code && side === message.side;
       side = message.side;
-      flipped = side === 'black';
+      if (!sameSeat) flipped = side === 'black';
       $('server').value = base;
       $('room-code').value = message.code;
       try { sessionStorage.setItem(storageKey, JSON.stringify({ base, code: message.code, token: message.token })); }
@@ -462,6 +511,18 @@ function answerVote(accept) {
 }
 $('accept').addEventListener('click', () => answerVote(true));
 $('decline').addEventListener('click', () => answerVote(false));
+$('result-dismiss').addEventListener('click', closeResult);
+$('result-summary').addEventListener('click', openResult);
+window.addEventListener('keydown', (event) => {
+  if ($('result-overlay').hidden) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeResult();
+  } else if (event.key === 'Tab' && !pendingVote()) {
+    event.preventDefault();
+    $('result-dismiss').focus({ preventScroll: true });
+  }
+});
 
 // A modeless, small voting window: move by pointer or with the keyboard-friendly button.
 let voteDrag = null;

@@ -4,7 +4,28 @@
 :root { --chess-font: "Xiangqi Running", "Xiangqi Kai"; font-family: "Microsoft YaHei", system-ui, sans-serif; color: #222; background: #f5f5f5; }
 * { box-sizing: border-box; }
 body { margin: 0; }
-main { max-width: 1050px; margin: 0 auto; padding: 20px; }
+main {
+  --sidebar-width: clamp(300px, 24vw, 350px);
+  --chrome-height: 272px;
+  --capture-space: 0px;
+  --legend-space: 0px;
+  --sandbox-space: 0px;
+  --result-space: 0px;
+  --board-size: clamp(280px, calc((100dvh - var(--chrome-height) - var(--capture-space) - var(--legend-space) - var(--sandbox-space) - var(--result-space)) * .9), 760px);
+  width: 100%;
+  max-width: calc(var(--board-size) + var(--sidebar-width) + 52px);
+  margin: 0 auto;
+  padding: 16px;
+}
+main:has(#clock-panel[hidden]) { --chrome-height: 240px; }
+main:has(#captures-top:not([hidden])) { --capture-space: 152px; }
+main:has(#danger-legend:not([hidden])) { --legend-space: 28px; }
+main:has(#sandbox-banner:not([hidden])) { --sandbox-space: 66px; }
+main:has(#result-summary:not([hidden])) { --result-space: 50px; }
+.game-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; margin-bottom: 12px; }
+.game-title { min-width: 0; }
+.game-title h1 { margin: 0; }
+.game-title p { margin: 4px 0 0; font-size: 14px; color: #666; }
 h1 { margin: 0 0 8px; font-size: 26px; }
 h1 small { font-size: 14px; font-weight: normal; color: #666; }
 h2 { margin: 0 0 12px; font-size: 17px; }
@@ -19,21 +40,33 @@ input, select { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius
 [hidden] { display: none !important; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar strong { margin-right: 6px; }
-.turn { margin: 16px 0 0; font-size: 19px; font-weight: bold; }
+main > .toolbar { gap: 7px; }
+main > .toolbar strong { font-size: 14px; }
+main > .toolbar button { padding: 6px 11px; font-size: 14px; line-height: 1.4; white-space: nowrap; }
+.turn { margin: 8px 0 0; font-size: 19px; line-height: 1.35; font-weight: bold; }
 .turn.red { color: #a32020; }
-.message { min-height: 26px; margin: 5px 0 12px; color: #444; }
+.message { min-height: 22px; margin: 3px 0 10px; font-size: 13px; line-height: 22px; color: #444; overflow-wrap: anywhere; }
 .message.error { color: #a32020; }
 .game-result { margin: 0 0 16px; padding: 12px 16px; border: 1px solid #b78025; border-radius: 4px; background: #fff4d8; font-weight: bold; }
-.clock-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; max-width: 540px; margin-bottom: 12px; }
-.clock { border: 1px solid #bbb; border-radius: 4px; background: white; padding: 8px 12px; }
-.clock span { display: block; font-size: 13px; }
+.clock-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); flex: none; gap: 10px; width: min(420px, 50%); max-width: 420px; margin: 0; }
+.clock { min-width: 0; border: 2px solid #c8c8c3; border-radius: 7px; background: white; padding: 7px 14px; }
+.clock span { display: block; font-size: 12px; line-height: 1.35; color: #555; }
 .clock.red span { color: #a32020; }
-.clock time { display: block; margin-top: 2px; font-size: 28px; line-height: 1.2; font-variant-numeric: tabular-nums; font-weight: bold; }
-.clock.running { border-color: #b78025; background: #fff4d8; box-shadow: inset 0 0 0 1px #b78025; }
+.clock time { display: block; margin-top: 2px; font-size: clamp(36px, 2.2vw, 42px); line-height: 1.08; font-variant-numeric: tabular-nums; font-weight: bold; letter-spacing: -.02em; }
+.clock.running { border-color: #ac7620; background: #fff1c9; box-shadow: 0 0 0 2px #d3aa5533; }
+.clock.running span { font-weight: 600; }
 .clock.low time { color: #a32020; }
 .clock-panel p { grid-column: 1 / -1; margin: 0; }
-.game-layout { display: grid; grid-template-columns: minmax(0, 540px) minmax(260px, 1fr); gap: 24px; align-items: start; }
-.board { width: 100%; max-width: 540px; aspect-ratio: 9 / 10; position: relative; background-color: var(--board-bg, #f0dfbe); background-image: var(--board-texture, none); border: 1px solid var(--board-edge, #997d50); user-select: none; font-family: var(--chess-font); font-synthesis: none; container-type: inline-size; }
+.clock-details { padding: 10px 12px; margin: 0 0 12px; border: 1px solid #dedbd3; border-radius: 5px; background: #faf8f2; }
+.clock-details p { margin: 4px 0; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) var(--sidebar-width); gap: 20px; align-items: start; }
+.game-area { min-width: 0; }
+.game-layout > aside { position: sticky; top: 12px; min-width: 0; max-height: calc(100dvh - 224px - var(--result-space)); overflow-y: auto; scrollbar-gutter: stable; padding-right: 4px; overscroll-behavior: contain; }
+.game-layout > aside > .panel:last-child { margin-bottom: 0; }
+.board-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; min-height: 32px; margin-bottom: 10px; }
+.board-tools button { padding: 5px 9px; font-size: 13px; line-height: 1.4; white-space: nowrap; }
+.game-area > #danger-legend { margin: 0 0 8px; line-height: 20px; }
+.board { width: 100%; max-width: var(--board-size, 760px); aspect-ratio: 9 / 10; position: relative; background-color: var(--board-bg, #f0dfbe); background-image: var(--board-texture, none); border: 1px solid var(--board-edge, #997d50); user-select: none; font-family: var(--chess-font); font-synthesis: none; container-type: inline-size; }
 :root[data-font="running"], .board[data-font="running"] { --chess-font: "Xiangqi Running", "Xiangqi Kai"; }
 :root[data-font="kai"], .board[data-font="kai"] { --chess-font: "Xiangqi Kai"; }
 :root[data-font="cursive"], .board[data-font="cursive"] { --chess-font: "Xiangqi Xingkai", "Xiangqi Kai"; }
@@ -43,7 +76,7 @@ input, select { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius
 .board-grid { stroke: var(--board-line, #80633d); }
 .board-river { fill: var(--board-line, #80633d); }
 .board .point, .board-river { font-family: var(--chess-font); }
-.point { --piece-shadow: 0 0 0 0 transparent; --last-ring: 0 0 0 0 transparent; --hover-glow: 0 0 0 0 transparent; position: absolute; transform: translate(-50%, -50%); width: 8%; height: 7.2%; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; display: grid; place-items: center; place-content: center; font-size: min(38px, max(0px, calc(8cqw - 8px))); font-weight: normal; line-height: 1; transition: transform 150ms ease, box-shadow 150ms ease; }
+.point { --piece-shadow: 0 0 0 0 transparent; --last-ring: 0 0 0 0 transparent; --hover-glow: 0 0 0 0 transparent; position: absolute; transform: translate(-50%, -50%); width: 8%; height: 7.2%; padding: 0; border: 2px solid transparent; border-radius: 50%; background: transparent; display: grid; place-items: center; place-content: center; font-size: min(54px, max(0px, calc(8cqw - 8px))); font-weight: normal; line-height: 1; transition: transform 150ms ease, box-shadow 150ms ease; }
 .point:hover:not(:disabled) { background: transparent; }
 .point.piece, .point.piece:hover:not(:disabled) { background: var(--piece-bg, #fff6df); }
 .point.piece { --piece-shadow: 0 1px 2px #0003; border-color: var(--piece-black, #494139); box-shadow: var(--last-ring), var(--hover-glow), var(--piece-shadow); z-index: 1; }
@@ -60,6 +93,7 @@ input, select { width: 100%; padding: 8px; border: 1px solid #bbb; border-radius
 .point.legal:not(.piece)::after { content: ''; width: 12px; height: 12px; background: var(--legal-mark, #23713b); border-radius: 50%; }
 .point.legal.piece { outline: 3px solid var(--legal-mark, #23713b); outline-offset: 2px; }
 .panel { background: white; border: 1px solid #ddd; border-radius: 4px; padding: 14px; margin-bottom: 16px; }
+.network-panel { border-color: #c6d1db; }
 .panel p { margin: 10px 0; font-size: 14px; }
 .panel label { display: block; margin-bottom: 6px; font-size: 14px; }
 .room-controls { display: grid; gap: 8px; margin-top: 10px; }
@@ -76,7 +110,21 @@ summary { cursor: pointer; font-size: 13px; }
 #addresses { padding-left: 18px; overflow-wrap: anywhere; font-size: 13px; }
 #history { margin: 0; padding-left: 28px; max-height: 240px; overflow-y: auto; font-size: 13px; line-height: 1.9; }
 #captures { overflow-wrap: anywhere; }
-@media (max-width: 760px) {
-  main { padding: 12px; }
-  .game-layout { grid-template-columns: minmax(0, 540px); justify-content: center; gap: 8px; }
+@media (max-width: 900px) {
+  main { max-width: 720px; padding: 12px; --board-size: clamp(300px, calc((100dvh - 260px - var(--capture-space) - var(--legend-space) - var(--sandbox-space) - var(--result-space)) * .9), 680px); }
+  .game-layout { grid-template-columns: minmax(0, 1fr); justify-content: center; gap: 16px; }
+  .game-area { width: 100%; max-width: var(--board-size); justify-self: center; }
+  .game-layout > aside { position: static; max-height: none; overflow: visible; padding-right: 0; }
+}
+@media (max-width: 600px) {
+  .game-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .game-title h1 { font-size: 24px; }
+  .game-title p { font-size: 12px; }
+  .clock-panel { width: 100%; max-width: none; gap: 8px; }
+  .clock { padding: 6px 12px; }
+  .clock time { font-size: 36px; }
+  main > .toolbar { gap: 6px; }
+  main > .toolbar strong { flex-basis: 100%; }
+  main > .toolbar button { padding: 6px 9px; }
+  .turn { font-size: 17px; }
 }

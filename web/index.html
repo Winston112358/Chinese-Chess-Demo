@@ -14,9 +14,21 @@
 </head>
 <body>
   <main>
-    <header>
-      <h1>中国象棋 <small>试玩版 v0.3.1</small></h1>
-      <p>同机双人或局域网对弈 · 红方先行</p>
+    <header class="game-header">
+      <div class="game-title">
+        <h1>中国象棋 <small>试玩版 v0.3.2</small></h1>
+        <p>同机双人或局域网对弈 · 红方先行</p>
+      </div>
+      <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
+        <div id="clock-red" class="clock red">
+          <span>红方剩余</span>
+          <time id="time-red">10:00</time>
+        </div>
+        <div id="clock-black" class="clock black">
+          <span>黑方剩余</span>
+          <time id="time-black">10:00</time>
+        </div>
+      </div>
     </header>
     <div class="toolbar">
       <strong id="mode">同机双人</strong>
@@ -29,65 +41,32 @@
     </div>
     <p id="turn" class="turn" aria-live="polite"></p>
     <p id="message" class="message" role="status"></p>
-    <p id="game-result" class="game-result" role="status" hidden></p>
+    <button id="result-summary" class="result-summary" type="button" hidden></button>
     <div class="game-layout">
-      <section aria-label="象棋对局">
-        <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
-          <div id="clock-red" class="clock red">
-            <span>红方剩余</span>
-            <time id="time-red">10:00</time>
+      <section class="game-area" aria-label="象棋对局">
+        <div class="board-tools">
+          <div class="sandbox-controls toolbar">
+            <button id="sandbox-toggle" aria-pressed="false">进入沙盘</button>
+            <button id="sandbox-undo" hidden>沙盘撤销一步</button>
           </div>
-          <div id="clock-black" class="clock black">
-            <span>黑方剩余</span>
-            <time id="time-black">10:00</time>
+          <div class="play-options">
+            <label><input id="danger-toggle" type="checkbox">吃子提示</label>
+            <label><input id="captures-toggle" type="checkbox">双方已吃子</label>
           </div>
-          <p id="time-control-summary" class="hint"></p>
-          <p id="clock-info" class="hint"></p>
-        </div>
-        <div class="sandbox-controls toolbar">
-          <button id="sandbox-toggle" aria-pressed="false">进入沙盘</button>
-          <button id="sandbox-undo" hidden>沙盘撤销一步</button>
         </div>
         <p id="sandbox-banner" class="sandbox-banner" role="status" hidden></p>
-        <div class="play-options">
-          <label><input id="danger-toggle" type="checkbox">吃子提示</label>
-          <label><input id="captures-toggle" type="checkbox">双方已吃子</label>
-        </div>
         <p id="danger-legend" class="hint" hidden>蓝紫虚线圈：对手下一步可合法吃到的己方棋子，仅提示当前局面。</p>
         <div id="captures-top" class="capture-row" hidden></div>
         <div id="board" class="board" data-font="running" data-skin="ivory" role="group" aria-label="象棋棋盘"></div>
         <div id="captures-bottom" class="capture-row" hidden></div>
       </section>
       <aside>
-        <section class="panel appearance-panel" aria-labelledby="appearance-heading">
-          <h2 id="appearance-heading">棋局外观 <small>仅自己可见</small></h2>
-          <label for="board-font">棋子与河界字体</label>
-          <select id="board-font" aria-describedby="font-note">
-            <option value="running">行书 · 龙藏衍生</option>
-            <option value="kai">楷体 · 文楷衍生</option>
-            <option value="cursive">草书 · 志莽行书衍生</option>
-          </select>
-          <p id="font-note" class="appearance-note">字库随软件提供，缺字逐字回退到自带楷体。</p>
-          <fieldset class="skin-options">
-            <legend>棋局皮肤</legend>
-            <div class="skin-group">
-              <h3>纯色配对</h3>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="ivory" checked><span class="skin-swatch" data-skin="ivory" aria-hidden="true"></span><span class="skin-name">米白 · 朱砂</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="celadon"><span class="skin-swatch" data-skin="celadon" aria-hidden="true"></span><span class="skin-name">青瓷 · 墨色</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="mist"><span class="skin-swatch" data-skin="mist" aria-hidden="true"></span><span class="skin-name">雾蓝 · 藏青</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="lotus"><span class="skin-swatch" data-skin="lotus" aria-hidden="true"></span><span class="skin-name">浅藕 · 紫檀</span></label>
-            </div>
-            <div class="skin-group">
-              <h3>浅木纹</h3>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="beech"><span class="skin-swatch" data-skin="beech" aria-hidden="true"></span><span class="skin-name">浅榉木</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="walnut"><span class="skin-swatch" data-skin="walnut" aria-hidden="true"></span><span class="skin-name">浅胡桃木</span></label>
-            </div>
-          </fieldset>
-          <p class="appearance-note">房主和参与者可各自选择。此设备会记住你的外观偏好。</p>
-          <p id="appearance-status" class="appearance-status" role="status" aria-live="polite"></p>
-        </section>
-        <section class="panel">
+        <section class="panel network-panel">
           <h2>局域网联机</h2>
+          <div id="clock-details" class="clock-details" hidden>
+            <p id="time-control-summary" class="hint"></p>
+            <p id="clock-info" class="hint"></p>
+          </div>
           <label for="server">房主的服务器地址</label>
           <input id="server" type="url" placeholder="http://192.168.1.100:3000" autocomplete="off">
           <div class="room-controls">
@@ -131,6 +110,33 @@
             <p class="hint">好友与房主需连接同一局域网。请选择当前网络的地址；房主程序需保持打开。若 Windows 提示防火墙，请允许专用网络访问。</p>
           </details>
         </section>
+        <section class="panel appearance-panel" aria-labelledby="appearance-heading">
+          <h2 id="appearance-heading">棋局外观 <small>仅自己可见</small></h2>
+          <label for="board-font">棋子与河界字体</label>
+          <select id="board-font" aria-describedby="font-note">
+            <option value="running">行书 · 龙藏衍生</option>
+            <option value="kai">楷体 · 文楷衍生</option>
+            <option value="cursive">草书 · 志莽行书衍生</option>
+          </select>
+          <p id="font-note" class="appearance-note">字库随软件提供，缺字逐字回退到自带楷体。</p>
+          <fieldset class="skin-options">
+            <legend>棋局皮肤</legend>
+            <div class="skin-group">
+              <h3>纯色配对</h3>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="ivory" checked><span class="skin-swatch" data-skin="ivory" aria-hidden="true"></span><span class="skin-name">米白 · 朱砂</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="celadon"><span class="skin-swatch" data-skin="celadon" aria-hidden="true"></span><span class="skin-name">青瓷 · 墨色</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="mist"><span class="skin-swatch" data-skin="mist" aria-hidden="true"></span><span class="skin-name">雾蓝 · 藏青</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="lotus"><span class="skin-swatch" data-skin="lotus" aria-hidden="true"></span><span class="skin-name">浅藕 · 紫檀</span></label>
+            </div>
+            <div class="skin-group">
+              <h3>浅木纹</h3>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="beech"><span class="skin-swatch" data-skin="beech" aria-hidden="true"></span><span class="skin-name">浅榉木</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="walnut"><span class="skin-swatch" data-skin="walnut" aria-hidden="true"></span><span class="skin-name">浅胡桃木</span></label>
+            </div>
+          </fieldset>
+          <p class="appearance-note">房主和参与者可各自选择。此设备会记住你的外观偏好。</p>
+          <p id="appearance-status" class="appearance-status" role="status" aria-live="polite"></p>
+        </section>
         <section class="panel">
           <h2>吃子与走棋记录</h2>
           <p id="captures">尚未吃子</p>
@@ -146,6 +152,13 @@
       </aside>
     </div>
   </main>
+  <div id="result-overlay" class="result-overlay" hidden>
+    <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="game-result">
+      <h2 id="result-title"></h2>
+      <p id="game-result" class="game-result"></p>
+      <button id="result-dismiss" type="button">查看棋盘</button>
+    </section>
+  </div>
   <section id="vote-popup" class="vote-popup" role="dialog" aria-modal="false" aria-labelledby="vote-title" hidden>
     <div id="vote-header" class="vote-header"><h2 id="vote-title">对局协商</h2><span>拖动标题可移开</span></div>
     <p id="vote-description" aria-live="polite"></p>
