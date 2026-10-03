@@ -16,7 +16,7 @@
   <main>
     <header class="game-header">
       <div class="game-title">
-        <h1>中国象棋 <small>试玩版 v0.4.0</small></h1>
+        <h1>中国象棋 <small>试玩版 v0.4.2</small></h1>
         <p>同机双人 · 皮卡鱼人机对战 · 局域网对弈</p>
       </div>
       <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
@@ -83,6 +83,8 @@
           </div>
           <label for="server">房主的服务器地址</label>
           <input id="server" type="url" placeholder="http://192.168.1.100:3000" autocomplete="off">
+          <button id="check-connection" type="button">检测连接</button>
+          <p id="connection-check-status" class="hint" role="status" aria-live="polite"></p>
           <div class="room-controls">
             <fieldset id="time-settings" class="time-settings">
               <legend>房主建房前设置每方总时间</legend>
@@ -119,9 +121,16 @@
           </div>
           <p id="network-status" aria-live="polite">创建房间后，把地址和房间码告诉好友。</p>
           <details>
-            <summary>本机可分享的局域网地址</summary>
+            <summary>房主的局域网地址（候选）</summary>
+            <p class="hint">这些地址属于提供当前网页的服务器。优先尝试 Wi-Fi / 有线网卡；候选地址不代表好友一定能访问，请在好友电脑上检测连接。</p>
+            <button id="refresh-addresses" type="button">刷新地址</button>
             <ul id="addresses"></ul>
-            <p class="hint">好友与房主需连接同一局域网。请选择当前网络的地址；房主程序需保持打开。若 Windows 提示防火墙，请允许专用网络访问。</p>
+            <details id="other-networks" hidden>
+              <summary>VPN / 虚拟网卡地址</summary>
+              <ul id="other-addresses"></ul>
+              <p class="hint">仅在双方使用同一 VPN / 虚拟网络且允许互访时尝试。</p>
+            </details>
+            <p class="hint">点击地址可选中复制。切换网络后请刷新，使用当前房主 IP 和实际端口。房主程序需保持打开；若 Windows 提示防火墙，请允许对应网络访问。</p>
           </details>
         </section>
         <section class="panel appearance-panel" aria-labelledby="appearance-heading">

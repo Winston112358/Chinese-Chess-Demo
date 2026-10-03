@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { networkInterfaces } from 'node:os';
+import { lanInfo } from './network.js';
 import { WebSocketServer } from 'ws';
 import { attachRooms } from './rooms.js';
 import { createPikafish } from './pikafish.js';
@@ -26,12 +26,6 @@ const assets = new Map([
   ['/shared/analysis.js', ['../shared/analysis.js', 'text/javascript; charset=utf-8']],
 ]);
 
-export function lanAddresses(port) {
-  return Object.values(networkInterfaces()).flat()
-    .filter((address) => address?.family === 'IPv4' && !address.internal)
-    .map((address) => `http://${address.address}:${port}`);
-}
-
 export async function startServer({ port = 3000, host = '0.0.0.0', roomOptions, engineOptions, aiEngine } = {}) {
   const ai = createAiHttp(aiEngine || createPikafish(engineOptions));
   const server = createServer(async (request, response) => {
@@ -48,8 +42,9 @@ export async function startServer({ port = 3000, host = '0.0.0.0', roomOptions, 
       return;
     }
     if (pathname === '/api/server-info') {
+      const info = await lanInfo(server.address().port, { host: server.address().address, localAddress: request.socket.localAddress });
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
-      response.end(request.method === 'HEAD' ? undefined : JSON.stringify({ addresses: lanAddresses(server.address().port) }));
+      response.end(request.method === 'HEAD' ? undefined : JSON.stringify(info));
       return;
     }
     const asset = assets.get(pathname);
@@ -79,6 +74,7 @@ export async function startServer({ port = 3000, host = '0.0.0.0', roomOptions, 
   }
   return {
     port: server.address().port,
+    info: () => lanInfo(server.address().port, { host: server.address().address }),
     close: async () => {
       const stopped = new Promise((resolve, reject) => {
         server.close((error) => error ? reject(error) : resolve());

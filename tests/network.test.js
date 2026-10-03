@@ -60,7 +60,10 @@ test('HTTP serves only app assets and reports LAN addresses', async (t) => {
     assert.equal(head.status, 200);
     assert.equal((await head.arrayBuffer()).byteLength, 0);
   }
-  assert.ok(Array.isArray((await (await fetch(base + '/api/server-info')).json()).addresses));
+  const info = await (await fetch(base + '/api/server-info')).json();
+  assert.deepEqual(info.addresses, [], 'A loopback-only service must not advertise LAN access');
+  assert.deepEqual(info.candidates, []);
+  assert.equal(info.listeningOn, '127.0.0.1');
   for (const path of ['/package.json', '/.git/config', '/src/server/rooms.js']) {
     assert.equal((await fetch(base + path)).status, 404);
   }

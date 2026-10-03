@@ -113,7 +113,13 @@ main > .toolbar button { padding: 6px 11px; font-size: 14px; line-height: 1.4; w
 #network-status { white-space: pre-line; font-weight: bold; }
 .hint { font-size: 12px; color: #666; }
 summary { cursor: pointer; font-size: 13px; }
-#addresses { padding-left: 18px; overflow-wrap: anywhere; font-size: 13px; }
+#addresses, #other-addresses { padding-left: 18px; overflow-wrap: anywhere; font-size: 13px; }
+.network-address { margin-bottom: 12px; }
+.network-address label { margin: 0 0 4px; font-size: 12px; }
+.network-address input { font-size: 12px; padding: 6px; }
+.network-panel #check-connection { margin-top: 8px; }
+#connection-check-status { white-space: pre-line; overflow-wrap: anywhere; }
+#connection-check-status.error { color: #a32020; }
 #history { margin: 0; padding-left: 28px; max-height: 240px; overflow-y: auto; font-size: 13px; line-height: 1.9; }
 #captures { overflow-wrap: anywhere; }
 @media (max-width: 900px) {

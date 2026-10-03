@@ -492,6 +492,42 @@ function serverBase(value) {
   return url.origin;
 }
 
+function connectionFailure(base) {
+  return `${base} 连接失败。请核对当前房主 IP、实际端口和服务是否运行；换用房主的 Wi-Fi / 有线地址。若仍失败，请检查双方网络是否允许互访及房主防火墙。VPN 地址需双方处于同一虚拟网络。`;
+}
+
+function connectionCheckStatus(message, error = false) {
+  $('connection-check-status').textContent = message;
+  $('connection-check-status').classList.toggle('error', error);
+}
+
+$('check-connection').addEventListener('click', () => {
+  let base;
+  try { base = serverBase($('server').value.trim()); }
+  catch (error) { connectionCheckStatus(error.message, true); return; }
+  const button = $('check-connection');
+  button.disabled = true;
+  connectionCheckStatus(`正在检测 ${base}…`);
+  let probe;
+  let timer;
+  let finished = false;
+  const finish = (message, error = false) => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timer);
+    button.disabled = false;
+    connectionCheckStatus(message, error);
+    probe?.close();
+  };
+  try { probe = new WebSocket(`${base.replace(/^http/, 'ws')}/ws`); }
+  catch { finish(connectionFailure(base), true); return; }
+  // A separate, seatless socket tests the guest's actual path without leaving a room.
+  timer = setTimeout(() => finish(`检测超时。${connectionFailure(base)}`, true), 8000);
+  probe.addEventListener('open', () => finish(`${base} 的对弈连接可达，可以创建或加入房间。本次检测未创建房间；只证明当前电脑到此地址可达。`));
+  probe.addEventListener('error', () => finish(connectionFailure(base), true));
+  probe.addEventListener('close', () => finish(connectionFailure(base), true));
+});
+
 function connect(action, address = $('server').value.trim()) {
   let base;
   try { base = serverBase(address); } catch (error) { notify(error.message, true); return; }
@@ -505,15 +541,22 @@ function connect(action, address = $('server').value.trim()) {
   sandbox = null;
   selected = null;
   notify('正在连接房主的服务器…');
-  const ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws`);
+  let ws;
+  try { ws = new WebSocket(`${base.replace(/^http/, 'ws')}/ws`); }
+  catch { connecting = false; connectionCheckStatus(connectionFailure(base), true); render(); return; }
   let assigned = false;
   socket = ws;
   connectionTimer = setTimeout(() => {
     if (socket !== ws) return;
+    connectionCheckStatus(`连接超时。${connectionFailure(base)}`, true);
     ws.close();
     notify('连接超时，请检查地址、网络和防火墙', true);
   }, 8000);
-  ws.addEventListener('open', () => { if (socket === ws) ws.send(JSON.stringify(action)); });
+  ws.addEventListener('open', () => {
+    if (socket !== ws) return;
+    connectionCheckStatus('');
+    ws.send(JSON.stringify(action));
+  });
   ws.addEventListener('message', (event) => {
     if (socket !== ws) return;
     const message = JSON.parse(event.data);
@@ -577,7 +620,11 @@ function connect(action, address = $('server').value.trim()) {
     }
     render();
   });
-  ws.addEventListener('error', () => { if (socket === ws) notify('无法连接，请检查房主地址、网络和防火墙', true); });
+  ws.addEventListener('error', () => {
+    if (socket !== ws) return;
+    connectionCheckStatus(connectionFailure(base), true);
+    notify('无法连接，请查看“检测连接”下方的排查提示', true);
+  });
   ws.addEventListener('close', () => {
     if (socket !== ws) return;
     clearTimeout(connectionTimer);
@@ -773,17 +820,42 @@ window.addEventListener('resize', () => {
   placeVote(bounds.left, bounds.top);
 });
 $('server').value = location.origin;
-fetch('/api/server-info').then((response) => response.json()).then(({ addresses }) => {
-  for (const address of addresses) {
-    const item = document.createElement('li');
-    const link = document.createElement('a');
-    link.href = address;
-    link.textContent = address;
-    item.append(link);
-    $('addresses').append(item);
+async function refreshAddresses() {
+  const button = $('refresh-addresses');
+  button.disabled = true;
+  $('addresses').textContent = '正在读取房主网卡…';
+  $('other-addresses').replaceChildren();
+  $('other-networks').hidden = true;
+  try {
+    const response = await fetch('/api/server-info');
+    if (!response.ok) throw new Error('无法读取服务器网卡');
+    const { addresses = [], candidates = addresses.map((url) => ({ url, interfaceName: '未识别网卡', kind: 'unknown' })) } = await response.json();
+    $('addresses').replaceChildren();
+    for (const candidate of candidates) {
+      const item = document.createElement('li');
+      item.className = 'network-address';
+      const label = document.createElement('label');
+      const kind = candidate.recommended ? 'Wi-Fi / 有线，优先尝试' : candidate.kind === 'virtual' ? 'VPN / 虚拟网络' : '网卡类型待确认';
+      label.textContent = `${candidate.interfaceName} · ${kind}${candidate.accessed ? ' · 当前访问路径' : ''}`;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.readOnly = true;
+      input.value = candidate.url;
+      input.addEventListener('click', () => input.select());
+      label.append(input);
+      item.append(label);
+      $(candidate.kind === 'virtual' ? 'other-addresses' : 'addresses').append(item);
+    }
+    $('other-networks').hidden = !candidates.some((candidate) => candidate.kind === 'virtual');
+    if (!candidates.some((candidate) => candidate.kind !== 'virtual')) $('addresses').textContent = '未找到 Wi-Fi / 有线地址。请确认房主已联网且服务允许局域网访问。';
+  } catch {
+    $('addresses').textContent = '无法读取房主网卡，请确认提供此页面的服务器仍在运行，再刷新。';
+  } finally {
+    button.disabled = false;
   }
-  if (!addresses.length) $('addresses').textContent = '未找到可用的局域网地址';
-}).catch(() => { $('addresses').textContent = '无法读取本机地址'; });
+}
+$('refresh-addresses').addEventListener('click', () => { void refreshAddresses(); });
+void refreshAddresses();
 render();
 void checkAi();
 setInterval(renderClocks, 100);

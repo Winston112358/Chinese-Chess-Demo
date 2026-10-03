@@ -69,7 +69,7 @@ class Element {
   focus() { this.document.activeElement = this; }
 }
 
-async function fixture(t) {
+async function fixture(t, { serverInfo = { addresses: [] } } = {}) {
   const elements = new Map();
   const document = {
     activeElement: null,
@@ -91,7 +91,7 @@ async function fixture(t) {
   }
   const requests = [];
   const fetch = async (url, options) => {
-    if (url === '/api/server-info') return response({ addresses: [] });
+    if (url === '/api/server-info') return response(serverInfo);
     if (url === '/api/ai/info') return response({ name: 'Pikafish', available: true });
     assert.equal(url, '/api/ai/move');
     return new Promise((resolve) => {
@@ -141,7 +141,8 @@ async function fixture(t) {
     setInterval() {},
   }, { filename: 'web/app.js' });
   const app = {
-    requests, sockets,
+    requests, sockets, timers,
+    setServerInfo: (info) => { serverInfo = info; },
     element: (id) => document.getElementById(id),
     get game() { return boardView.game; },
     get canSelect() { return boardView.canSelect; },
@@ -179,6 +180,64 @@ async function fixture(t) {
   await flush();
   return app;
 }
+
+test('LAN UI identifies the server adapters, separates VPNs and replaces stale addresses on refresh', async (t) => {
+  const app = await fixture(t, { serverInfo: { candidates: [
+    { url: 'http://10.24.33.144:3000', interfaceName: 'WLAN', recommended: true, kind: 'lan', accessed: true },
+    { url: 'http://26.45.156.217:3000', interfaceName: 'Radmin VPN', kind: 'virtual' },
+  ] } });
+  const address = app.element('addresses').children[0].children[0];
+  assert.match(address.textContent, /WLAN.*优先尝试.*当前访问路径/);
+  assert.equal(address.children[0].value, 'http://10.24.33.144:3000');
+  assert.equal(address.children[0].readOnly, true);
+  assert.equal(app.element('other-networks').hidden, false);
+  assert.equal(app.element('other-addresses').children.length, 1);
+  app.setServerInfo({ candidates: [{ url: 'http://192.168.1.5:45000', interfaceName: 'WLAN', recommended: true, kind: 'lan' }] });
+  app.click('refresh-addresses');
+  await flush();
+  assert.equal(app.element('addresses').children.length, 1);
+  assert.equal(app.element('addresses').children[0].children[0].children[0].value, 'http://192.168.1.5:45000');
+  assert.equal(app.element('other-addresses').children.length, 0);
+  assert.equal(app.element('other-networks').hidden, true);
+  assert.equal(app.element('refresh-addresses').disabled, false);
+});
+
+test('connection check uses a separate seatless socket and does not disconnect an existing room', async (t) => {
+  const app = await fixture(t);
+  const { socket: roomSocket } = await app.room();
+  app.element('server').value = 'http://10.24.33.144:45678/';
+  app.click('check-connection');
+  const probe = app.sockets.at(-1);
+  assert.notEqual(probe, roomSocket);
+  assert.equal(probe.url, 'ws://10.24.33.144:45678/ws');
+  assert.equal(app.element('check-connection').disabled, true);
+  probe.open();
+  assert.deepEqual(probe.sent, [], 'The check must not create, join or claim a seat');
+  assert.equal(probe.readyState, 3);
+  assert.equal(roomSocket.readyState, 1);
+  assert.equal(app.element('check-connection').disabled, false);
+  assert.match(app.element('connection-check-status').textContent, /可达.*只证明当前电脑/);
+});
+
+test('failed and timed-out connection checks preserve actionable errors after the socket closes', async (t) => {
+  const app = await fixture(t);
+  app.element('server').value = 'http://26.45.156.217:3000';
+  app.click('check-connection');
+  app.sockets.at(-1).listeners.get('error')({});
+  assert.match(app.element('connection-check-status').textContent, /26\.45\.156\.217:3000.*连接失败.*防火墙/);
+  assert.equal(app.element('check-connection').disabled, false);
+  app.element('server').value = 'http://10.32.253.250:45000';
+  app.click('check-connection');
+  [...app.timers.values()].at(-1)();
+  assert.equal(app.sockets.at(-1).readyState, 3);
+  assert.match(app.element('connection-check-status').textContent, /检测超时.*10\.32\.253\.250:45000/);
+  assert.equal(app.element('check-connection').disabled, false);
+  app.click('create');
+  const joinSocket = app.sockets.at(-1);
+  joinSocket.listeners.get('error')({});
+  joinSocket.close();
+  assert.match(app.element('connection-check-status').textContent, /10\.32\.253\.250:45000.*连接失败/);
+});
 
 test('local PvP assistance plays exactly one legal move and leaves the next player in control', async (t) => {
   const app = await fixture(t);
