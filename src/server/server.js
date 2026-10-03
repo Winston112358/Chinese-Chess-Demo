@@ -11,6 +11,7 @@ const assets = new Map([
   ['/index.html', ['../../web/index.html', 'text/html; charset=utf-8']],
   ['/app.js', ['../../web/app.js', 'text/javascript; charset=utf-8']],
   ['/ai-game.js', ['../../web/ai-game.js', 'text/javascript; charset=utf-8']],
+  ['/room-controls.js', ['../../web/room-controls.js', 'text/javascript; charset=utf-8']],
   ['/board.js', ['../../web/board.js', 'text/javascript; charset=utf-8']],
   ['/piece-glyph.js', ['../../web/piece-glyph.js', 'text/javascript; charset=utf-8']],
   ['/game-tools.js', ['../../web/game-tools.js', 'text/javascript; charset=utf-8']],

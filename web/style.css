@@ -11,7 +11,8 @@ main {
   --legend-space: 0px;
   --sandbox-space: 0px;
   --result-space: 0px;
-  --board-size: clamp(280px, calc((100dvh - var(--chrome-height) - var(--capture-space) - var(--legend-space) - var(--sandbox-space) - var(--result-space)) * .9), 760px);
+  --ready-space: 0px;
+  --board-size: clamp(280px, calc((100dvh - var(--chrome-height) - var(--capture-space) - var(--legend-space) - var(--sandbox-space) - var(--result-space) - var(--ready-space)) * .9), 760px);
   width: 100%;
   max-width: calc(var(--board-size) + var(--sidebar-width) + 52px);
   margin: 0 auto;
@@ -22,6 +23,7 @@ main:has(#captures-top:not([hidden])) { --capture-space: 152px; }
 main:has(#danger-legend:not([hidden])) { --legend-space: 28px; }
 main:has(#sandbox-banner:not([hidden])) { --sandbox-space: 66px; }
 main:has(#result-summary:not([hidden])) { --result-space: 50px; }
+main:has(#ready-panel:not([hidden])) { --ready-space: 72px; }
 .game-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-width: 0; margin-bottom: 12px; }
 .game-title { min-width: 0; }
 .game-title h1 { margin: 0; }
@@ -123,7 +125,7 @@ summary { cursor: pointer; font-size: 13px; }
 #history { margin: 0; padding-left: 28px; max-height: 240px; overflow-y: auto; font-size: 13px; line-height: 1.9; }
 #captures { overflow-wrap: anywhere; }
 @media (max-width: 900px) {
-  main { max-width: 720px; padding: 12px; --board-size: clamp(300px, calc((100dvh - 260px - var(--capture-space) - var(--legend-space) - var(--sandbox-space) - var(--result-space)) * .9), 680px); }
+  main { max-width: 720px; padding: 12px; --board-size: clamp(300px, calc((100dvh - 260px - var(--capture-space) - var(--legend-space) - var(--sandbox-space) - var(--result-space) - var(--ready-space)) * .9), 680px); }
   .game-layout { grid-template-columns: minmax(0, 1fr); justify-content: center; gap: 16px; }
   .game-area { width: 100%; max-width: var(--board-size); justify-self: center; }
   .game-layout > aside { position: static; max-height: none; overflow: visible; padding-right: 0; }

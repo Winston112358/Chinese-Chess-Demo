@@ -4,6 +4,7 @@ import { createSandbox, rebaseSandbox, sandboxApplyMove, sandboxUndo } from '/sh
 import { dangerousPieces } from '/shared/analysis.js';
 import { renderCaptured } from '/game-tools.js';
 import { aiUndoCount, createAiSearch } from '/ai-game.js';
+import { createRoomControls, roomIsPlaying, restartDescription, readTimes } from '/room-controls.js';
 
 const $ = (id) => document.getElementById(id);
 let localGame = createInitialGame();
@@ -32,6 +33,25 @@ const assistSearch = createAiSearch();
 let assistJob = null;
 const storageKey = 'xiangqi-last-room';
 const ACTION_NAMES = { undo: '单步悔棋', draw: '求和', resign: '认输', restart: '重新开局' };
+const roomControls = createRoomControls({
+  document, now: () => performance.now(), notify,
+  getState: () => ({ room, side, connected: socket?.readyState === WebSocket.OPEN,
+    busy: connecting || movePending || actionSending || Boolean(pendingVote()), receivedAt: clockReceivedAt }),
+  onReady: (message) => { actionSending = true; send(message); render(); },
+  onRestart: (message) => {
+    cancelAssist();
+    actionSending = true;
+    selected = null;
+    send(message);
+    notify('已发送下一局配置，等待对方同意');
+    render();
+  },
+});
+
+function timingStatus() {
+  if (!roomIsPlaying(room)) return '尚未开局，不扣时';
+  return room?.clock?.enabled === false ? '本局不计时' : '计时继续';
+}
 
 function savedSeat() {
   try { return JSON.parse(sessionStorage.getItem(storageKey)); } catch { return null; }
@@ -110,8 +130,9 @@ function formatTime(milliseconds) {
 }
 
 function renderClocks() {
+  roomControls.renderCountdown();
   const clock = room?.clock;
-  $('clock-panel').hidden = !clock;
+  $('clock-panel').hidden = !clock || clock.enabled === false;
   $('clock-details').hidden = !clock;
   if (!clock) return;
   const elapsed = Math.max(0, performance.now() - clockReceivedAt);
@@ -126,11 +147,12 @@ function renderClocks() {
     if (running && remaining === 0) awaitingResult = true;
   }
   const minutes = (milliseconds) => String(Number((milliseconds / 60_000).toFixed(2)));
-  const summary = `房间时限：红方 ${minutes(clock.initialMs.red)} 分钟 · 黑方 ${minutes(clock.initialMs.black)} 分钟`;
+  const summary = clock.enabled === false ? '本局不计时' : `房间时限：红方 ${minutes(clock.initialMs.red)} 分钟 · 黑方 ${minutes(clock.initialMs.black)} 分钟`;
   if ($('time-control-summary').textContent !== summary) $('time-control-summary').textContent = summary;
   let info;
-  if (game.result) info = '对局已结束，计时停止。双方同意重新开局后恢复本房间时限。';
-  else if (!clock.started) info = '等待双方首次连接，尚未开钟；红方先走。';
+  if (game.result) info = '对局已结束。可配置下一局并请求对方同意。';
+  else if (!roomIsPlaying(room)) info = '双方准备并倒数结束后开局；准备和倒数不扣时。';
+  else if (clock.enabled === false) info = '本局不限时；红方先走。';
   else if (socket?.readyState !== WebSocket.OPEN) info = '连接已断开，计时继续；恢复房间后同步剩余时间。';
   else if (awaitingResult) info = '剩余时间已到零，等待服务器确认对局结果。';
   else info = `${SIDE_NAMES[clock.runningSide || game.turn]}计时中；沙盘、协商与断线均不停钟。`;
@@ -138,7 +160,8 @@ function renderClocks() {
 }
 
 function pendingVote() {
-  return room?.pendingAction || (room?.pendingRestart ? { action: 'restart', side: room.pendingRestart } : null);
+  const restart = room?.pendingRestart;
+  return room?.pendingAction || (typeof restart === 'string' ? { action: 'restart', side: restart } : restart) || null;
 }
 
 function renderVote() {
@@ -152,11 +175,11 @@ function renderVote() {
     undo: '同意后仅撤销真实对局的最后一步，恢复该步之前的棋权和吃子；已用时间不返还。',
     draw: '同意后本局按和棋结束，双方停止计时。',
     resign: `同意后${SIDE_NAMES[request.side]}认输，对方获胜，双方停止计时。`,
-    restart: '同意后重置真实棋局和双方时间，红方先行。',
+    restart: restartDescription(request.config, side),
   };
   $('vote-description').textContent = explanation[request.action];
   $('vote-wait').hidden = !own;
-  $('vote-wait').textContent = game.result ? '等待对手投票；本局计时已停止。' : '等待对手投票；暂不可落子，计时继续。';
+  $('vote-wait').textContent = game.result ? '等待对手投票；本局已结束。' : `等待对手投票；暂不可落子，${timingStatus()}。`;
   $('vote-buttons').hidden = own;
   $('accept').disabled = $('decline').disabled = actionSending || connecting
     || socket?.readyState !== WebSocket.OPEN || !room.players.red || !room.players.black;
@@ -178,7 +201,7 @@ function render() {
   }
   const connected = socket?.readyState === WebSocket.OPEN;
   const bothOnline = room?.players.red && room?.players.black;
-  const ready = !room || (room.clock?.started && connected);
+  const ready = roomIsPlaying(room) && (!room || connected);
   const view = sandbox?.game || game;
   const request = pendingVote();
   const canNegotiate = Boolean(room && connected && bothOnline && room.clock?.started && !connecting && !actionSending && !request);
@@ -187,6 +210,7 @@ function render() {
     ? `沙盘 · ${view.result ? '推演结束' : `${SIDE_NAMES[view.turn]}走棋`} · 已推演 ${view.history.length} 步`
     : game.result ? `对局结束 · 已走 ${game.history.length} 步` : `${SIDE_NAMES[game.turn]}走棋 · 已走 ${game.history.length} 步${isInCheck(game.board, game.turn) ? ' · 将军！请应将' : ''}`;
   $('turn').className = `turn ${view.result?.winner || view.turn}`;
+  if (!sandbox && room && !roomIsPlaying(room)) $('turn').textContent = room.phase === 'countdown' ? '双方已准备 · 即将开局' : '准备阶段';
   if (!sandbox && request && !game.result) $('turn').textContent += ' · 等待投票';
   if (!sandbox && aiHumanSide && !game.result && game.turn !== aiHumanSide) {
     $('turn').textContent += aiThinking ? ' · 皮卡鱼思考中…' : ' · 等待电脑走棋';
@@ -198,7 +222,7 @@ function render() {
   $('draw').disabled = !canNegotiate || Boolean(game.result);
   $('draw').hidden = Boolean(aiHumanSide);
   $('resign').disabled = (aiHumanSide ? connecting : !canNegotiate) || Boolean(game.result);
-  $('restart').disabled = connecting || (room && (!connected || !bothOnline || actionSending || Boolean(request)));
+  $('restart').disabled = connecting || (room && (!connected || !bothOnline || actionSending || Boolean(request) || room.phase === 'countdown'));
   $('sandbox-toggle').textContent = sandbox ? '退出沙盘' : '进入沙盘';
   $('sandbox-toggle').setAttribute('aria-pressed', String(Boolean(sandbox)));
   $('sandbox-toggle').disabled = !sandbox && (!ready || connecting || movePending || Boolean(game.result));
@@ -208,9 +232,9 @@ function render() {
   $('board').classList.toggle('sandbox-board', Boolean(sandbox));
   if (sandbox) {
     const real = game.result ? resultDescription(game.result) : request
-      ? `真实棋局：等待投票，${SIDE_NAMES[game.turn]}计时中。`
+      ? `真实棋局：等待投票，${timingStatus()}。`
       : aiHumanSide ? `真实棋局：${game.turn === aiHumanSide ? '轮到你走棋' : aiThinking ? '皮卡鱼思考中' : '等待电脑走棋'}。`
-        : room ? `真实棋局：${SIDE_NAMES[game.turn]}走棋，计时继续。` : `真实棋局：${SIDE_NAMES[game.turn]}走棋。`;
+        : room ? `真实棋局：${SIDE_NAMES[game.turn]}走棋，${timingStatus()}。` : `真实棋局：${SIDE_NAMES[game.turn]}走棋。`;
     const analysis = view.result ? `推演结果：${resultDescription(view.result)}` : `${SIDE_NAMES[view.turn]}走棋${isInCheck(view.board, view.turn) ? ' · 将军' : ''}。`;
     $('sandbox-banner').textContent = `沙盘模式 · ${analysis} ${real}`;
   }
@@ -223,15 +247,16 @@ function render() {
   $('time-settings').hidden = Boolean(room);
   $('resume').hidden = !savedSeat() || Boolean(room);
   $('resume').disabled = connecting;
+  roomControls.render();
   renderVote();
   renderResult();
   if (room) {
     let status;
-    if (!connected) status = `连接已断开，请恢复房间${room.clock?.started && !game.result ? '；计时继续' : ''}`;
+    if (!connected) status = `连接已断开，请恢复房间；${timingStatus()}`;
     else if (game.result) status = `对局已结束${bothOnline ? '，可双方同意重新开局' : '，等待对手重连后重新开局'}`;
-    else if (!room.clock?.started) status = '等待好友首次连接；尚未开钟，不能落子';
-    else if (request) status = `等待投票，暂不可落子；计时继续${bothOnline ? '' : '，等待对手重连'}`;
-    else status = bothOnline ? '双方已连接，可以对弈' : '对手已断线；计时继续，你仍可在己方回合落子';
+    else if (!roomIsPlaying(room)) status = bothOnline ? '双方已连接；准备后倒数开局，不扣时' : '等待好友加入；准备阶段不扣时';
+    else if (request) status = `等待投票，暂不可落子；${timingStatus()}${bothOnline ? '' : '，等待对手重连'}`;
+    else status = bothOnline ? '双方已连接，可以对弈' : `对手已断线；${timingStatus()}，己方回合仍可落子`;
     $('network-status').textContent = `房间码：${room.code}\n${status}${request?.side === side ? `\n已请求${ACTION_NAMES[request.action]}，等待对手回应` : ''}`;
     $('resume').hidden = connected;
   }
@@ -285,7 +310,7 @@ function clickPoint(point) {
   if (game.result) return notify(`对局已结束。${resultDescription(game.result)}`, true);
   if (room && (pendingVote() || actionSending)) return notify('请先完成投票，再继续走棋', true);
   if (room && socket?.readyState !== WebSocket.OPEN) return notify('连接已断开，请恢复房间后落子；计时继续', true);
-  if (room && !room.clock?.started) return notify('等待好友首次连接后开钟落子', true);
+  if (room && !roomIsPlaying(room)) return;
   if (room && game.turn !== side) return notify('现在是对手的回合', true);
   if (aiHumanSide && game.turn !== aiHumanSide) return notify(aiThinking ? '皮卡鱼正在思考，你可以进入沙盘推演' : '等待电脑走棋，请点击“重试电脑走棋”', Boolean(aiError));
   const piece = pieceAt(game.board, point);
@@ -343,7 +368,7 @@ function assistUnavailableReason() {
   if (connecting || movePending) return '请等待服务器回应';
   if (actionSending || pendingVote()) return '请先完成投票，再使用 AI 辅助';
   if (room && socket?.readyState !== WebSocket.OPEN) return '请先恢复房间连接';
-  if (room && !room.clock?.started) return '等待好友加入后才能走棋';
+  if (room && !roomIsPlaying(room)) return '等待双方准备并倒数结束后才能走棋';
   if (room && game.turn !== side) return '轮到你走棋时才能使用 AI 辅助';
   if (aiInfoLoading || !aiInfo) return '正在检查皮卡鱼…';
   if (!aiInfo.available) return aiInfo.error || '皮卡鱼不可用，请在右侧重新检查';
@@ -573,7 +598,7 @@ function connect(action, address = $('server').value.trim()) {
       assigned = true;
       const sameSeat = room?.code === message.code && side === message.side;
       side = message.side;
-      if (!sameSeat) flipped = side === 'black';
+      if (!sameSeat) { flipped = side === 'black'; cancelAssist(); sandbox = null; selected = null; }
       $('server').value = base;
       $('room-code').value = message.code;
       try { sessionStorage.setItem(storageKey, JSON.stringify({ base, code: message.code, token: message.token })); }
@@ -589,21 +614,23 @@ function connect(action, address = $('server').value.trim()) {
       connecting = false;
       actionSending = false;
       let sandboxRebased = false;
+      if (sandbox && previous?.round !== room.round) sandbox = null;
       if (sandbox && positionChanged) {
         sandbox = rebaseSandbox(sandbox, game, room.revision);
         sandboxRebased = true;
       }
       if (sandbox && game.result) sandbox = null;
       if (positionChanged || resultChanged) movePending = false;
-      if (positionChanged || game.result || (!sandbox && (!room.clock?.started || game.turn !== side || pendingVote()))) selected = null;
+      if (positionChanged || game.result || (!sandbox && (!roomIsPlaying(room) || game.turn !== side || pendingVote()))) selected = null;
       if (game.result) notify(resultDescription(game.result));
       else if (sandboxRebased) notify('真实棋局已更新，沙盘推演已重置');
-      else if (positionChanged) notify(room.clock?.started ? (wasMovePending ? '落子成功，轮到对方' : '棋盘已同步，按回合落子') : '等待好友加入房间，尚未开钟');
+      else if (positionChanged) notify(roomIsPlaying(room) ? (wasMovePending ? '落子成功，轮到对方' : '棋盘已同步，按回合落子') : '准备阶段；双方准备后倒数开局');
+      else if (previous?.phase !== room.phase) notify(room.phase === 'playing' ? '对局开始，红方先行' : room.phase === 'countdown' ? '双方已准备，正在倒数' : '开局倒数已取消，请重新准备');
       else if (previous?.pendingAction && !room.pendingAction) notify('协商已处理，继续正常对局');
       else if (previous.players.red !== room.players.red || previous.players.black !== room.players.black) {
-        notify(pendingVote() ? '等待投票，暂不可落子；计时继续' : room.players.red && room.players.black ? '双方已连接' : (room.clock?.started ? '对手已断线；计时继续，己方回合仍可落子' : '等待好友加入房间，尚未开钟'));
-      } else if (previous.pendingRestart !== room.pendingRestart) {
-        notify(room.pendingRestart ? '等待重新开局投票，暂不可落子；计时继续' : '重新开局请求已结束');
+        notify(pendingVote() ? `等待投票，暂不可落子；${timingStatus()}` : room.players.red && room.players.black ? '双方已连接' : (roomIsPlaying(room) ? `对手已断线；${timingStatus()}，己方回合仍可落子` : '等待好友加入房间，准备阶段不扣时'));
+      } else if (previous.pendingRestart?.id !== room.pendingRestart?.id) {
+        notify(room.pendingRestart ? `等待重新开局投票，暂不可落子；${timingStatus()}` : '重新开局请求已结束');
       }
     } else if (message.type === 'error') {
       connecting = false;
@@ -640,7 +667,7 @@ function connect(action, address = $('server').value.trim()) {
 }
 
 $('restart').addEventListener('click', () => {
-  if (room) { actionSending = true; if (!sandbox) selected = null; send({ type: 'restart-request' }); render(); return; }
+  if (room) { cancelAssist(); roomControls.open(); render(); return; }
   cancelAi();
   game = createInitialGame();
   if (!aiHumanSide) localGame = game;
@@ -685,7 +712,7 @@ function requestAction(action) {
   actionSending = true;
   if (!sandbox) selected = null;
   send({ type: 'action-request', action, revision: room.revision });
-  notify(`已发起${ACTION_NAMES[action]}，等待投票；暂不可落子，计时继续`);
+  notify(`已发起${ACTION_NAMES[action]}，等待投票；暂不可落子，${timingStatus()}`);
   render();
 }
 $('sandbox-toggle').addEventListener('click', () => {
@@ -723,32 +750,10 @@ $('local').addEventListener('click', () => {
   notify('同机双人，按回合落子');
   render();
 });
-function readTimeControl() {
-  const timeControl = {};
-  for (const color of ['red', 'black']) {
-    const choice = $(`${color}-time-choice`).value;
-    const input = $(`${color}-time-custom`);
-    const value = choice === 'custom' ? input.value.trim() : choice;
-    const minutes = Number(value);
-    if (!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(value) || minutes < 0.1 || minutes > 180) {
-      input.focus();
-      throw new Error(`${SIDE_NAMES[color]}总时间请输入 0.1–180 分钟，最多两位小数`);
-    }
-    timeControl[color] = Math.round(minutes * 60_000);
-  }
-  return timeControl;
-}
-for (const color of ['red', 'black']) {
-  $(`${color}-time-choice`).addEventListener('change', () => {
-    const custom = $(`${color}-time-choice`).value === 'custom';
-    $(`${color}-custom-label`).hidden = !custom;
-    if (custom) $(`${color}-time-custom`).focus();
-  });
-}
 $('create').addEventListener('click', () => {
   let timeControl;
-  try { timeControl = readTimeControl(); } catch (error) { notify(error.message, true); return; }
-  connect({ type: 'create', timeControl });
+  try { timeControl = $('timed-toggle').checked ? readTimes(document) : undefined; } catch (error) { notify(error.message, true); return; }
+  connect({ type: 'create', timeControl, timed: $('timed-toggle').checked });
 });
 $('join').addEventListener('click', () => {
   const code = $('room-code').value.trim().toUpperCase();
@@ -764,7 +769,7 @@ function answerVote(accept) {
   if (!request || request.side === side) return;
   actionSending = true;
   send(request.action === 'restart'
-    ? { type: 'restart-answer', accept }
+    ? { type: 'restart-answer', requestId: request.id, accept }
     : { type: 'action-answer', requestId: request.id, accept });
   renderVote();
 }
@@ -773,6 +778,7 @@ $('decline').addEventListener('click', () => answerVote(false));
 $('result-dismiss').addEventListener('click', closeResult);
 $('result-summary').addEventListener('click', openResult);
 window.addEventListener('keydown', (event) => {
+  if ($('restart-config').open) return;
   if ($('result-overlay').hidden) return;
   if (event.key === 'Escape') {
     event.preventDefault();

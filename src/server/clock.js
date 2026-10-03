@@ -12,13 +12,13 @@ export function parseTimeControl(value) {
   return { ok: true, timeControl: { red: value.red, black: value.black } };
 }
 
-export function createClock(initialMs) {
-  return { initialMs: { ...initialMs }, remainingMs: { ...initialMs }, runningSide: null, started: false, changedAt: null };
+export function createClock(initialMs, enabled = true) {
+  return { initialMs: { ...initialMs }, remainingMs: { ...initialMs }, enabled, runningSide: null, started: false, changedAt: null };
 }
 
 export function startClock(clock, side, now) {
   clock.started = true;
-  clock.runningSide = side;
+  clock.runningSide = clock.enabled ? side : null;
   clock.changedAt = now;
 }
 
@@ -39,6 +39,6 @@ export function clockSnapshot(clock, now) {
   }
   return {
     initialMs: { ...clock.initialMs }, remainingMs, runningSide: clock.runningSide,
-    started: clock.started, serverNow: now,
+    enabled: clock.enabled, started: clock.started, serverNow: now,
   };
 }

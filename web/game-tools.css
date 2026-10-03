@@ -219,3 +219,26 @@
   .result-card { max-height: calc(100dvh - 32px); padding: 24px 20px; }
   .result-card .game-result { font-size: 19px; }
 }
+.ready-panel { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 12px; padding: 10px 14px; border: 1px solid #cbbb99; border-radius: 8px; background: #fff8e8; }
+.ready-statuses { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 14px; }
+.ready-statuses span { color: #705f45; }
+.ready-statuses .is-ready { color: #287342; font-weight: bold; }
+.ready-panel button { flex: 0 0 auto; padding: 8px 18px; font-weight: bold; }
+.timed-choice { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+.timed-choice input { width: auto; margin: 0; }
+.restart-config { width: min(450px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 2px solid #c49a4b; border-radius: 12px; background: #fffaf0; color: #292219; box-shadow: 0 12px 48px #0005; }
+.restart-config::backdrop { background: #17203380; backdrop-filter: blur(2px); }
+.restart-config h2 { margin: 0 0 18px; font-size: 23px; }
+.restart-config label { display: block; margin: 12px 0 6px; font-size: 14px; }
+.restart-config .timed-choice { display: flex; }
+.restart-config .toolbar { justify-content: flex-end; margin: 18px 0 0; }
+#restart-config-error { color: #a32020; font-size: 13px; }
+.countdown-overlay { position: fixed; inset: 0; z-index: 35; display: grid; place-items: center; padding: 20px; background: #17203365; backdrop-filter: blur(1px); pointer-events: none; }
+.countdown-card { display: grid; gap: 6px; min-width: 230px; padding: 26px 44px; border: 2px solid #c49a4b; border-radius: 16px; background: #fff9e8; box-shadow: 0 12px 48px #0005; text-align: center; color: #6b4a12; }
+.countdown-card strong { font-size: clamp(72px, 10vw, 110px); line-height: 1.1; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .ready-panel { align-items: flex-start; gap: 8px; padding: 10px; }
+  .ready-statuses { flex-direction: column; gap: 5px; font-size: 13px; }
+  .ready-panel button { padding: 8px 10px; }
+  .restart-config { padding: 20px; }
+}

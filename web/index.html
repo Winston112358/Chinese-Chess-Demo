@@ -16,7 +16,7 @@
   <main>
     <header class="game-header">
       <div class="game-title">
-        <h1>中国象棋 <small>试玩版 v0.4.2</small></h1>
+        <h1>中国象棋 <small>试玩版 v0.4.3</small></h1>
         <p>同机双人 · 皮卡鱼人机对战 · 局域网对弈</p>
       </div>
       <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
@@ -41,6 +41,10 @@
     </div>
     <p id="turn" class="turn" aria-live="polite"></p>
     <p id="message" class="message" role="status"></p>
+    <section id="ready-panel" class="ready-panel" aria-label="对局准备" hidden>
+      <div class="ready-statuses"><span id="own-ready-status"></span><span id="opponent-ready-status"></span></div>
+      <button id="ready-button" type="button">准备好了</button>
+    </section>
     <button id="result-summary" class="result-summary" type="button" hidden></button>
     <div class="game-layout">
       <section class="game-area" aria-label="象棋对局">
@@ -88,7 +92,8 @@
           <div class="room-controls">
             <fieldset id="time-settings" class="time-settings">
               <legend>房主建房前设置每方总时间</legend>
-              <div class="time-options">
+              <label class="timed-choice"><input id="timed-toggle" type="checkbox" checked>启用计时</label>
+              <div id="time-options" class="time-options">
                 <div>
                   <label for="red-time-choice">红方</label>
                   <select id="red-time-choice">
@@ -112,7 +117,7 @@
                   </label>
                 </div>
               </div>
-              <p class="hint">自定义 0.1–180 分钟，最多两位小数。好友加入后开钟；走棋消耗己方总时间，断线不停钟。</p>
+              <p class="hint">自定义 0.1–180 分钟，最多两位小数。双方准备并倒数结束后开钟。</p>
             </fieldset>
             <button id="create">创建房间（红方）</button>
             <input id="room-code" aria-label="房间码" placeholder="6 位房间码" maxlength="6" autocomplete="off">
@@ -168,7 +173,7 @@
         <section class="panel">
           <h2>对局说明</h2>
           <p>已限制棋子的走法、吃子、将帅照面和自陷将军，并提示将军。</p>
-          <p>自动裁定将死、困毙、将帅被吃和联机超时，结束后停止落子。局域网双方同意后可重新开局，沿用本房间时限。</p>
+          <p>自动裁定将死、困毙、将帅被吃和联机超时。联机双方准备后倒数开局；重开可协商执子、是否计时及双方时间。</p>
           <p>沙盘仅在本机推演，真实对局不停钟；真实棋盘更新后同步沙盘基线。联机悔棋、求和和认输须对手投票同意。</p>
           <p>双人对局中可点击“AI 帮我走一步”，让皮卡鱼分析当前局面并直接落子，每次只走一步。联机仅限自己的回合，分析期间照常计时；可取消分析或自行落子。</p>
           <p>人机模式接入皮卡鱼，可选先后手，认输立即生效。暂不提供自动和棋或长将长捉裁定。同机双人与人机对战不计时。</p>
@@ -176,6 +181,38 @@
       </aside>
     </div>
   </main>
+  <div id="start-countdown" class="countdown-overlay" role="status" aria-live="assertive" hidden>
+    <div class="countdown-card"><span>双方已准备</span><strong id="countdown-number">3</strong><span>即将开局</span></div>
+  </div>
+  <dialog id="restart-config" class="restart-config" aria-labelledby="restart-config-title">
+    <form id="restart-form" novalidate>
+      <h2 id="restart-config-title">配置下一局</h2>
+      <label for="restart-red-side">谁执红方（先手）</label>
+      <select id="restart-red-side">
+        <option id="restart-own-red" value="red">我方执红</option>
+        <option id="restart-other-red" value="black">对方执红</option>
+      </select>
+      <label class="timed-choice"><input id="restart-timed" type="checkbox" checked>启用计时</label>
+      <div id="restart-time-options" class="time-options">
+        <div>
+          <label for="restart-red-time-choice">红方总时间</label>
+          <select id="restart-red-time-choice"><option value="10">10 分钟</option><option value="15">15 分钟</option><option value="custom">自定义分钟</option></select>
+          <label id="restart-red-custom-label" for="restart-red-time-custom" hidden>红方分钟数
+            <input id="restart-red-time-custom" type="number" min="0.1" max="180" step="0.01" value="10" inputmode="decimal">
+          </label>
+        </div>
+        <div>
+          <label for="restart-black-time-choice">黑方总时间</label>
+          <select id="restart-black-time-choice"><option value="10">10 分钟</option><option value="15">15 分钟</option><option value="custom">自定义分钟</option></select>
+          <label id="restart-black-custom-label" for="restart-black-time-custom" hidden>黑方分钟数
+            <input id="restart-black-time-custom" type="number" min="0.1" max="180" step="0.01" value="10" inputmode="decimal">
+          </label>
+        </div>
+      </div>
+      <p id="restart-config-error" class="error" role="status"></p>
+      <div class="toolbar"><button id="restart-submit" type="submit">发送重开请求</button><button id="restart-cancel" type="button">取消</button></div>
+    </form>
+  </dialog>
   <div id="result-overlay" class="result-overlay" hidden>
     <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="game-result">
       <h2 id="result-title"></h2>

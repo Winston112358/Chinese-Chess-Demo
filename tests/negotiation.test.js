@@ -1,15 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { WebSocket } from 'ws';
-import { startServer } from '../src/server/server.js';
+import { startServer as startRealServer } from '../src/server/server.js';
 import { createInitialGame } from '../src/shared/rules.js';
+
+const startServer = (options) => startRealServer({ ...options, roomOptions: { countdownMs: 0, ...options.roomOptions } });
 
 async function client(port) {
   const socket = new WebSocket(`ws://127.0.0.1:${port}/ws`);
   const inbox = [];
   const pending = [];
+  let latestRoom;
   socket.on('message', (data) => {
     const message = JSON.parse(data.toString());
+    if (message.type === 'state') latestRoom = message.room;
     const index = pending.findIndex((wait) => wait.predicate(message));
     if (index < 0) return inbox.push(message);
     const [wait] = pending.splice(index, 1);
@@ -19,7 +23,10 @@ async function client(port) {
   await new Promise((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
   return {
     socket,
-    send: (message) => socket.send(JSON.stringify(message)),
+    get room() { return latestRoom; },
+    discardPreparing: () => { for (let i = inbox.length - 1; i >= 0; i--) if (inbox[i].type === 'state' && !inbox[i].room.clock.started) inbox.splice(i, 1); },
+    send: (message) => socket.send(JSON.stringify(message.type === 'restart-answer'
+      ? { requestId: latestRoom?.pendingRestart?.id, ...message } : message)),
     wait: (predicate) => new Promise((resolve, reject) => {
       const index = inbox.findIndex(predicate);
       if (index >= 0) return resolve(inbox.splice(index, 1)[0]);
@@ -31,6 +38,16 @@ async function client(port) {
 const state = (revision, extra = () => true) => (message) => message.type === 'state'
   && message.room.revision === revision && extra(message.room);
 const error = (message) => message.type === 'error';
+
+// These older move/clock tests start explicitly; countdown timing is covered separately.
+async function prepare(red, black) {
+  for (const player of [red, black]) player.send({ type: 'ready', ready: true, round: player.room.round });
+  const initial = (await red.wait((message) => message.type === 'state' && message.room.clock.started)).room;
+  assert.deepEqual((await black.wait((message) => message.type === 'state' && message.room.clock.started)).room, initial);
+  red.discardPreparing();
+  black.discardPreparing();
+  return initial;
+}
 
 async function setup(t, timeControl = { red: 6000, black: 9000 }, clockTickMs = 60_000) {
   let elapsed = 0;
@@ -46,8 +63,7 @@ async function setup(t, timeControl = { red: 6000, black: 9000 }, clockTickMs = 
     const black = await client(server.port);
     black.send({ type: 'join', code: redSeat.code });
     const blackSeat = await black.wait((message) => message.type === 'seat');
-    const initial = (await red.wait(state(0, (room) => room.clock.started))).room;
-    assert.deepEqual((await black.wait(state(0))).room, initial);
+    const initial = await prepare(red, black);
     return { black, blackSeat, initial };
   };
   return { server, red, redSeat, waiting, connectBlack, advance: (milliseconds) => { elapsed += milliseconds; } };
@@ -104,7 +120,7 @@ test('negotiation requires connected seats, valid format, current board and a si
   assert.deepEqual(declined.game, initial.game);
   assert.equal(declined.revision, 0);
   black.send({ type: 'restart-request' });
-  await broadcast(red, black, 0, (room) => room.pendingRestart === 'black');
+  await broadcast(red, black, 0, (room) => room.pendingRestart?.side === 'black');
   red.send({ type: 'action-request', action: 'draw', revision: 0 });
   assert.match((await red.wait(error)).error, /已有/);
 });
@@ -230,13 +246,14 @@ for (const [action, requesterSide, expected] of [
     black.send({ type: 'move', from: { x: 0, y: 3 }, to: { x: 0, y: 4 }, revision: 2 });
     assert.match((await black.wait(error)).error, /结束/);
     requester.send({ type: 'restart-request' });
-    const restart = await broadcast(red, black, 2, (room) => room.pendingRestart === requesterSide);
+    const restart = await broadcast(red, black, 2, (room) => room.pendingRestart?.side === requesterSide);
     assert.deepEqual(restart.clock.remainingMs, ended.clock.remainingMs);
     responder.send({ type: 'restart-answer', accept: true });
     const fresh = await broadcast(red, black, 3);
     assert.deepEqual(fresh.game, createInitialGame());
     assert.equal(fresh.pendingAction, null);
-    assert.equal(fresh.clock.runningSide, 'red');
+    assert.equal(fresh.phase, 'preparing');
+    assert.equal(fresh.clock.runningSide, null);
     assert.deepEqual(fresh.clock.remainingMs, { red: 6000, black: 9000 });
   });
 }

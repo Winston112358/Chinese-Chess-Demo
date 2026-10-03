@@ -6,6 +6,7 @@ import * as rules from '../src/shared/rules.js';
 import * as sandbox from '../src/shared/sandbox.js';
 import * as analysis from '../src/shared/analysis.js';
 import * as ai from '../web/ai-game.js';
+import * as roomControls from '../web/room-controls.js';
 
 const [appSource, html] = await Promise.all([
   readFile(new URL('../web/app.js', import.meta.url), 'utf8'),
@@ -67,6 +68,8 @@ class Element {
   getClientRects() { return this.hidden ? [] : [this.getBoundingClientRect()]; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 300, height: 200 }; }
   focus() { this.document.activeElement = this; }
+  showModal() { this.open = true; }
+  close() { this.open = false; }
 }
 
 async function fixture(t, { serverInfo = { addresses: [] } } = {}) {
@@ -116,18 +119,21 @@ async function fixture(t, { serverInfo = { addresses: [] } } = {}) {
   const storage = new Map();
   const timers = new Map();
   let timerId = 0;
+  let elapsed = 0;
+  const intervals = [];
   let boardView;
   const dependencies = {
     '/shared/rules.js': rules,
     '/shared/sandbox.js': sandbox,
     '/shared/analysis.js': analysis,
     '/ai-game.js': { ...ai, createAiSearch: (options = {}) => ai.createAiSearch({ ...options, fetchImpl: fetch }) },
+    '/room-controls.js': roomControls,
     '/board.js': { renderBoard: (_element, options) => { boardView = options; } },
     '/game-tools.js': { renderCaptured() {} },
   };
   runInNewContext(executableApp, {
     dependencies, document, fetch, WebSocket: Socket, URL, AbortSignal, AbortController, structuredClone,
-    performance: { now: () => 0 },
+    performance: { now: () => elapsed },
     window: { addEventListener() {}, innerWidth: 1200, innerHeight: 900 },
     MutationObserver: class { observe() {} },
     location: { origin: 'http://localhost:3000' },
@@ -138,10 +144,11 @@ async function fixture(t, { serverInfo = { addresses: [] } } = {}) {
     },
     setTimeout: (callback) => { timers.set(++timerId, callback); return timerId; },
     clearTimeout: (id) => timers.delete(id),
-    setInterval() {},
+    setInterval(callback) { intervals.push(callback); },
   }, { filename: 'web/app.js' });
   const app = {
     requests, sockets, timers,
+    advance: (ms) => { elapsed += ms; for (const callback of intervals) callback(); },
     setServerInfo: (info) => { serverInfo = info; },
     element: (id) => document.getElementById(id),
     get game() { return boardView.game; },
@@ -425,4 +432,99 @@ test('an illegal engine answer never bypasses the shared move rules', async (t) 
   assert.equal(app.game.history.length, 0);
   assert.equal(app.element('ai-assist').disabled, false);
   assert.ok(app.element('message').textContent);
+});
+
+test('preparation and the 3-2-1 countdown block manual play and AI assistance without charging clocks', async (t) => {
+  const app = await fixture(t);
+  const { socket, room } = await app.room({ started: false });
+  const preparing = { ...room, round: 7, phase: 'preparing', ready: { red: false, black: true },
+    clock: { ...room.clock, enabled: true, started: false, runningSide: null } };
+  socket.receive({ type: 'state', room: preparing });
+  assert.equal(app.element('ready-panel').hidden, false);
+  assert.match(app.element('own-ready-status').textContent, /未准备/);
+  assert.match(app.element('opponent-ready-status').textContent, /已准备/);
+  app.move(redMove);
+  app.click('ai-assist');
+  assert.equal(app.canSelect, false);
+  assert.equal(app.requests.length, 0);
+  assert.equal(socket.sent.length, 1);
+  app.click('ready-button');
+  assert.deepEqual(socket.sent.at(-1), { type: 'ready', ready: true, round: 7 });
+  const counting = { ...preparing, phase: 'countdown', countdownMs: 3000, ready: { red: true, black: true } };
+  socket.receive({ type: 'state', room: counting });
+  for (const number of ['3', '2', '1']) {
+    assert.equal(app.element('countdown-number').textContent, number);
+    assert.equal(app.element('start-countdown').hidden, false);
+    assert.equal(app.element('ready-button').disabled, true);
+    assert.equal(app.element('ai-assist').disabled, true);
+    assert.equal(app.element('time-red').textContent, '10:00');
+    app.advance(1000);
+  }
+  assert.equal(app.canSelect, false, 'Client countdown expiry cannot authorize a move before server start');
+  socket.receive({ type: 'state', room: { ...counting, phase: 'playing', clock: { ...counting.clock, started: true, runningSide: 'red' } } });
+  assert.equal(app.element('start-countdown').hidden, true);
+  assert.equal(app.element('ready-panel').hidden, true);
+  assert.equal(app.canSelect, true);
+  assert.equal(app.element('ai-assist').disabled, false);
+});
+
+test('the restart editor sends nothing until submission and includes color choice and asymmetric times', async (t) => {
+  const app = await fixture(t);
+  const { socket, room } = await app.room({ side: 'black' });
+  app.click('restart');
+  assert.equal(app.element('restart-config').open, true);
+  assert.equal(socket.sent.length, 1);
+  app.element('restart-red-side').value = 'black';
+  app.element('restart-red-time-choice').value = '15';
+  app.element('restart-black-time-choice').value = 'custom';
+  app.element('restart-black-time-custom').value = '0.10';
+  app.element('restart-form').dispatch('submit');
+  assert.equal(app.element('restart-config').open, false);
+  assert.deepEqual(socket.sent.at(-1), { type: 'restart-request', revision: room.revision,
+    config: { redSide: 'black', timed: true, timeControl: { red: 900000, black: 6000 } } });
+});
+
+test('invalid custom times stay in the editor; untimed submission ignores disabled time inputs', async (t) => {
+  const app = await fixture(t);
+  const { socket } = await app.room();
+  app.click('restart');
+  app.element('restart-red-time-choice').value = 'custom';
+  app.element('restart-red-time-custom').value = '0.09';
+  app.element('restart-form').dispatch('submit');
+  assert.equal(app.element('restart-config').open, true);
+  assert.equal(socket.sent.length, 1);
+  assert.match(app.element('restart-config-error').textContent, /0.1–180/);
+  app.element('restart-timed').checked = false;
+  app.element('restart-timed').dispatch('change');
+  assert.equal(app.element('restart-time-options').hidden, true);
+  app.element('restart-form').dispatch('submit');
+  assert.equal(socket.sent.at(-1).config.timed, false);
+  assert.equal(app.element('restart-config').open, false);
+});
+
+test('a configured vote explains the next game from the receiver perspective and returns the exact request ID', async (t) => {
+  const app = await fixture(t);
+  const { socket, room } = await app.room({ side: 'black' });
+  const pendingRestart = { id: 'next-round', action: 'restart', side: 'red', revision: room.revision,
+    config: { redSide: 'black', timed: true, timeControl: { red: 900000, black: 740400 } } };
+  socket.receive({ type: 'state', room: { ...room, pendingRestart } });
+  assert.match(app.element('vote-description').textContent, /你执红先行.*红方 15 分钟.*黑方 12.34 分钟.*准备/);
+  assert.equal(app.canSelect, false);
+  app.click('decline');
+  assert.deepEqual(socket.sent.at(-1), { type: 'restart-answer', requestId: 'next-round', accept: false });
+});
+
+test('changing sides for an untimed new round clears old analysis and requires fresh preparation', async (t) => {
+  const app = await fixture(t);
+  const { socket, room } = await app.room();
+  app.click('ai-assist');
+  socket.receive({ type: 'seat', side: 'black', code: room.code, token: 'test-seat' });
+  socket.receive({ type: 'state', room: { ...room, round: 1, revision: room.revision + 1, phase: 'preparing',
+    ready: { red: false, black: false }, clock: { ...room.clock, enabled: false, started: false, runningSide: null } } });
+  await app.reply(0, { move: redMove });
+  assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), []);
+  assert.equal(app.element('clock-panel').hidden, true);
+  assert.equal(app.element('time-control-summary').textContent, '本局不计时');
+  assert.match(app.element('own-ready-status').textContent, /黑方.*未准备/);
+  assert.equal(app.canSelect, false);
 });
