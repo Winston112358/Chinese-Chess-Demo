@@ -16,6 +16,7 @@ const assets = new Map([
   ['/piece-glyph.js', ['../../web/piece-glyph.js', 'text/javascript; charset=utf-8']],
   ['/game-tools.js', ['../../web/game-tools.js', 'text/javascript; charset=utf-8']],
   ['/move-notation.js', ['../../web/move-notation.js', 'text/javascript; charset=utf-8']],
+  ['/move-records.js', ['../../web/move-records.js', 'text/javascript; charset=utf-8']],
   ['/game-tools.css', ['../../web/game-tools.css', 'text/css; charset=utf-8']],
   ['/style.css', ['../../web/style.css', 'text/css; charset=utf-8']],
   ['/appearance.css', ['../../web/appearance.css', 'text/css; charset=utf-8']],
@@ -40,6 +41,7 @@ const assets = new Map([
   ['/shared/rules.js', ['../shared/rules.js', 'text/javascript; charset=utf-8']],
   ['/shared/adjudication.js', ['../shared/adjudication.js', 'text/javascript; charset=utf-8']],
   ['/shared/sandbox.js', ['../shared/sandbox.js', 'text/javascript; charset=utf-8']],
+  ['/shared/replay.js', ['../shared/replay.js', 'text/javascript; charset=utf-8']],
   ['/shared/analysis.js', ['../shared/analysis.js', 'text/javascript; charset=utf-8']],
 ]);
 

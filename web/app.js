@@ -5,6 +5,8 @@ import { dangerousPieces } from '/shared/analysis.js';
 import { renderCaptured } from '/game-tools.js';
 import { aiUndoCount, createAiSearch } from '/ai-game.js';
 import { chineseMoveNotation } from '/move-notation.js';
+import { getMoveRecords } from '/move-records.js';
+import { createReplay, replayGame, seekReplay } from '/shared/replay.js';
 import { createRoomControls, roomIsPlaying, restartDescription, readTimes, readMoveTime } from '/room-controls.js';
 
 const $ = (id) => document.getElementById(id);
@@ -21,6 +23,12 @@ let connectionTimer;
 let clockReceivedAt = 0;
 let clockExpired = false;
 let sandbox = null;
+let replay = null;
+let replayPlaying = false;
+let replayTimer = null;
+let replayGeneration = 0;
+let replayIntervalMs = 1000;
+let recordCache = { board: null, history: null, records: [] };
 let actionSending = false;
 let dangerCache = { board: null, side: null, points: [] };
 let displayedResultKey = '';
@@ -99,6 +107,8 @@ function resultKey(result) {
 
 function openResult() {
   if (!game.result) return;
+  pauseReplay();
+  if (replay) renderReplay();
   const overlay = $('result-overlay');
   const alreadyOpen = !overlay.hidden;
   overlay.hidden = false;
@@ -132,6 +142,8 @@ function renderResult() {
   const key = result ? `${room ? `room:${room.code}` : aiHumanSide ? 'ai' : 'local'}:${resultKey(result)}` : '';
   $('result-summary').hidden = !result;
   $('result-summary').textContent = result ? resultDescription(result) : '';
+  $('replay-open').hidden = !result || Boolean(replay);
+  $('replay-start').disabled = !result || Boolean(replay);
   $('result-title').textContent = result ? (result.winner === null ? '和棋' : `${SIDE_NAMES[result.winner]}获胜`) : '';
   $('game-result').hidden = !result;
   $('game-result').textContent = result ? resultDescription(result) : '';
@@ -141,6 +153,100 @@ function renderResult() {
     if (key) openResult();
     else closeResult();
   }
+}
+
+function pauseReplay() {
+  clearTimeout(replayTimer);
+  replayTimer = null;
+  replayPlaying = false;
+  replayGeneration++;
+}
+
+function resetReplay() {
+  pauseReplay();
+  if (replay) sandbox = null;
+  replay = null;
+  selected = null;
+}
+
+function replayDelay() {
+  const seconds = Number($('replay-speed').value === 'custom' ? $('replay-custom').value : $('replay-speed').value);
+  if (!Number.isFinite(seconds) || seconds < 0.1 || seconds > 3600) throw new Error('播放间隔须为 0.1–3600 秒');
+  return seconds * 1000;
+}
+
+function recordsFor(position) {
+  if (recordCache.board !== position.board || recordCache.history !== position.history) {
+    recordCache = { board: position.board, history: position.history, records: getMoveRecords(position) };
+  }
+  return recordCache.records;
+}
+
+function renderReplay() {
+  $('replay-panel').hidden = !replay;
+  $('replay-custom-label').hidden = $('replay-speed').value !== 'custom';
+  if (!replay) return;
+  const blocked = Boolean(sandbox);
+  const atStart = replay.index === 0;
+  const atEnd = replay.index === replay.length;
+  const record = recordsFor(replay.frames.at(-1))[replay.index - 1];
+  $('replay-status').textContent = `第 ${replay.index} / ${replay.length} 步 · ${record ? record.notation : '初始局面'} · ${blocked ? '沙盘推演，回放已暂停' : replayPlaying ? '播放中' : atEnd ? '播放完毕' : '已暂停'}`;
+  $('replay-first').disabled = $('replay-prev').disabled = blocked || atStart;
+  $('replay-last').disabled = $('replay-next').disabled = blocked || atEnd;
+  $('replay-play').disabled = blocked || replay.length === 0;
+  $('replay-play').textContent = replayPlaying ? '暂停' : atEnd && replay.length ? '从头播放' : '播放';
+  $('replay-play').setAttribute('aria-pressed', String(replayPlaying));
+  $('replay-position').max = String(replay.length);
+  $('replay-position').value = String(replay.index);
+  $('replay-position').disabled = blocked || replay.length === 0;
+  $('replay-speed').disabled = $('replay-custom').disabled = blocked;
+}
+
+function openReplay() {
+  if (!game.result || replay) return;
+  cancelAi();
+  pauseReplay();
+  sandbox = null;
+  selected = null;
+  replay = createReplay(game);
+  closeResult();
+  notify('已进入复盘；只回放最终采用的落子，可播放或逐步查看');
+  render();
+  $('replay-panel').scrollIntoView?.({ block: 'nearest' });
+  $('replay-play').focus({ preventScroll: true });
+}
+
+function moveReplay(index) {
+  if (!replay || sandbox) return;
+  pauseReplay();
+  replay = seekReplay(replay, index);
+  selected = null;
+  render();
+}
+
+function scheduleReplay() {
+  if (!replay || !replayPlaying || sandbox) return;
+  const generation = replayGeneration;
+  const snapshot = replay;
+  replayTimer = setTimeout(() => {
+    if (generation !== replayGeneration || replay !== snapshot || !replayPlaying || sandbox) return;
+    replayTimer = null;
+    replay = seekReplay(replay, replay.index + 1);
+    selected = null;
+    if (replay.index === replay.length) pauseReplay();
+    render();
+    scheduleReplay();
+  }, replayIntervalMs);
+}
+
+function toggleReplayPlayback() {
+  if (!replay || sandbox || !replay.length) return;
+  if (replayPlaying) { pauseReplay(); render(); return; }
+  try { replayIntervalMs = replayDelay(); } catch (error) { notify(error.message, true); return; }
+  if (replay.index === replay.length) replay = seekReplay(replay, 0);
+  replayPlaying = true;
+  render();
+  scheduleReplay();
 }
 
 function formatTime(milliseconds) {
@@ -250,13 +356,15 @@ function render() {
   const connected = socket?.readyState === WebSocket.OPEN;
   const bothOnline = room?.players.red && room?.players.black;
   const ready = roomIsPlaying(room) && (!room || connected);
-  const view = sandbox?.game || game;
+  const replayView = replay ? replayGame(replay) : null;
+  const view = sandbox?.game || replayView || game;
   const request = pendingVote();
   const canNegotiate = Boolean(room && connected && bothOnline && room.clock?.started && !connecting && !actionSending && !request);
   $('mode').textContent = room ? `局域网 · 你是${SIDE_NAMES[side]}` : aiHumanSide ? `人机 · 你是${SIDE_NAMES[aiHumanSide]}` : '同机双人';
   $('turn').textContent = sandbox
     ? `沙盘 · ${view.result ? '推演结束' : `${SIDE_NAMES[view.turn]}走棋`} · 已推演 ${view.history.length} 步`
-    : game.result ? `对局结束 · 已走 ${game.history.length} 步` : `${SIDE_NAMES[game.turn]}走棋 · 已走 ${game.history.length} 步${isInCheck(game.board, game.turn) ? ' · 将军！请应将' : ''}`;
+    : replay ? `复盘 · 第 ${replay.index} / ${replay.length} 步 · ${replay.index === replay.length ? '终局' : `${SIDE_NAMES[view.turn]}走棋`}`
+      : game.result ? `对局结束 · 已走 ${game.history.length} 步` : `${SIDE_NAMES[game.turn]}走棋 · 已走 ${game.history.length} 步${isInCheck(game.board, game.turn) ? ' · 将军！请应将' : ''}`;
   $('turn').className = `turn ${view.result?.winner || view.turn}`;
   if (!sandbox && room && !roomIsPlaying(room)) $('turn').textContent = room.phase === 'countdown' ? '双方已准备 · 即将开局' : '准备阶段';
   if (!sandbox && request && !game.result) $('turn').textContent += ' · 等待投票';
@@ -265,20 +373,21 @@ function render() {
   }
   const undoable = canUndoResult(game.result);
   $('undo').textContent = room ? '请求单步悔棋' : aiHumanSide ? '撤回我的上一步' : '悔棋一步';
-  $('undo').disabled = !(aiHumanSide ? aiUndoCount(game, aiHumanSide) : game.history.length) || !undoable || connecting || (room && !canNegotiate);
+  $('undo').disabled = Boolean(replay) || !(aiHumanSide ? aiUndoCount(game, aiHumanSide) : game.history.length) || !undoable || connecting || (room && !canNegotiate);
   $('draw').disabled = !canNegotiate || Boolean(game.result);
   $('draw').hidden = Boolean(aiHumanSide);
   $('resign').disabled = (aiHumanSide ? connecting : !canNegotiate) || Boolean(game.result);
   $('restart').disabled = connecting || (room && (!connected || !bothOnline || actionSending || Boolean(request) || room.phase === 'countdown'));
   $('sandbox-toggle').textContent = sandbox ? '退出沙盘' : '进入沙盘';
   $('sandbox-toggle').setAttribute('aria-pressed', String(Boolean(sandbox)));
-  $('sandbox-toggle').disabled = !sandbox && (!ready || connecting || movePending || Boolean(game.result));
+  $('sandbox-toggle').disabled = !sandbox && !replay && (!ready || connecting || movePending || Boolean(game.result));
   $('sandbox-undo').hidden = !sandbox;
   $('sandbox-undo').disabled = !sandbox?.game.history.length;
   $('sandbox-banner').hidden = !sandbox;
   $('board').classList.toggle('sandbox-board', Boolean(sandbox));
+  $('board').classList.toggle('replay-board', Boolean(replay));
   if (sandbox) {
-    const real = game.result ? resultDescription(game.result) : request
+    const real = replay ? `复盘停在第 ${replay.index} 步，退出沙盘后可继续回放。` : game.result ? resultDescription(game.result) : request
       ? `真实棋局：等待投票，${timingStatus()}。`
       : aiHumanSide ? `真实棋局：${game.turn === aiHumanSide ? '轮到你走棋' : aiThinking ? '皮卡鱼思考中' : '等待电脑走棋'}。`
         : room ? `真实棋局：${SIDE_NAMES[game.turn]}走棋，${timingStatus()}。` : `真实棋局：${SIDE_NAMES[game.turn]}走棋。`;
@@ -297,6 +406,7 @@ function render() {
   roomControls.render();
   renderVote();
   renderResult();
+  renderReplay();
   if (room) {
     let status;
     if (!connected) status = `连接已断开，请恢复房间；${timingStatus()}`;
@@ -311,8 +421,8 @@ function render() {
   renderAi();
   renderBoard($('board'), {
     game: view, selected, flipped,
-    context: `${room ? `room:${room.code}` : aiHumanSide ? `ai:${aiHumanSide}` : 'local'}:${sandbox ? 'sandbox' : 'real'}`,
-    canSelect: !view.result && (sandbox ? true : ready && !clockUnavailableReason() && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side) && (!aiHumanSide || game.turn === aiHumanSide)),
+    context: `${room ? `room:${room.code}` : aiHumanSide ? `ai:${aiHumanSide}` : 'local'}:${sandbox ? 'sandbox' : replay ? 'replay' : 'real'}`,
+    canSelect: !view.result && (sandbox ? true : !replay && ready && !clockUnavailableReason() && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side) && (!aiHumanSide || game.turn === aiHumanSide)),
     moves: selected ? legalMoves(view, selected) : [],
     danger: dangerPoints(view),
     onClick: clickPoint,
@@ -320,17 +430,39 @@ function render() {
   const showCaptures = $('captures-toggle').checked;
   $('captures-top').hidden = $('captures-bottom').hidden = !showCaptures;
   $('danger-legend').hidden = !$('danger-toggle').checked;
-  const captureGame = sandbox ? { ...view, history: [...game.history, ...view.history] } : game;
+  const baseGame = replayView || game;
+  const captureGame = sandbox ? { ...view, history: [...baseGame.history, ...view.history] } : baseGame;
   if (showCaptures) renderCaptured($('captures-top'), $('captures-bottom'), { game: captureGame, flipped });
   const captured = captureGame.history.filter((move) => move.captured);
   $('captures').textContent = captured.length ? captured.map((move) => `${SIDE_NAMES[move.captured.side]}${PIECE_NAMES[move.captured.side][move.captured.type]}`).join('、') : '尚未吃子';
   $('history').replaceChildren();
-  view.history.forEach((move) => {
+  const historyGame = replay && !sandbox ? replay.frames.at(-1) : view;
+  let currentRecord;
+  recordsFor(historyGame).forEach((record) => {
     const item = document.createElement('li');
-    item.textContent = `${SIDE_NAMES[move.piece.side]}${PIECE_NAMES[move.piece.side][move.piece.type]} (${move.from.x + 1},${move.from.y + 1}) → (${move.to.x + 1},${move.to.y + 1})${move.captured ? ` 吃${PIECE_NAMES[move.captured.side][move.captured.type]}` : ''}`;
+    if (replay && !sandbox) {
+      const button = document.createElement('button');
+      button.className = 'move-record';
+      button.type = 'button';
+      button.textContent = record.text;
+      button.addEventListener('click', () => moveReplay(record.ply));
+      item.append(button);
+      if (record.ply === replay.index) { item.setAttribute('aria-current', 'step'); currentRecord = item; }
+    } else item.textContent = record.text;
     $('history').append(item);
   });
-  $('history').scrollTop = $('history').scrollHeight;
+  if (replay && !sandbox) {
+    const list = $('history');
+    if (!currentRecord) list.scrollTop = 0;
+    else {
+      // Scroll the record list alone; moving the whole sidebar would hide playback controls.
+      const row = currentRecord.getBoundingClientRect();
+      const bounds = list.getBoundingClientRect();
+      const offset = row.top < bounds.top ? row.top - bounds.top
+        : row.bottom > bounds.bottom ? row.bottom - bounds.bottom : 0;
+      if (offset) list.scrollTop = (list.scrollTop || 0) + offset;
+    }
+  } else $('history').scrollTop = $('history').scrollHeight;
 }
 
 function clickPoint(point) {
@@ -353,6 +485,7 @@ function clickPoint(point) {
     render();
     return;
   }
+  if (replay) return notify('复盘中请用播放或逐步回放；可进入沙盘尝试其他走法');
   if (connecting || movePending) return notify('请等待服务器回应', true);
   if (game.result) return notify(`对局已结束。${resultDescription(game.result)}`, true);
   if (room && (pendingVote() || actionSending)) return notify('请先完成投票，再继续走棋', true);
@@ -417,6 +550,7 @@ function renderAi() {
 }
 
 function assistUnavailableReason() {
+  if (replay) return '复盘中不可走真实棋局；可进入沙盘推演';
   if (aiHumanSide) return 'AI 辅助用于同机双人或局域网对局';
   if (sandbox) return '请先退出沙盘，再使用 AI 辅助走真实棋局';
   if (game.result) return '对局已结束';
@@ -567,7 +701,7 @@ function cancelAi() {
 }
 
 async function playAiMove() {
-  if (!aiHumanSide || room || connecting || game.result || game.turn === aiHumanSide || aiThinking) return;
+  if (replay || !aiHumanSide || room || connecting || game.result || game.turn === aiHumanSide || aiThinking) return;
   const position = game;
   const player = aiHumanSide;
   aiThinking = true;
@@ -596,6 +730,7 @@ async function playAiMove() {
 
 // Stop callbacks from the former online seat before changing local modes.
 function disconnectRoom() {
+  resetReplay();
   const old = socket;
   socket = null;
   old?.close();
@@ -675,6 +810,7 @@ $('check-connection').addEventListener('click', () => {
 function connect(action, address = $('server').value.trim()) {
   let base;
   try { base = serverBase(address); } catch (error) { notify(error.message, true); return; }
+  resetReplay();
   cancelAi();
   if (aiHumanSide) { aiHumanSide = null; game = localGame; flipped = false; }
   if (socket) socket.close();
@@ -719,7 +855,7 @@ function connect(action, address = $('server').value.trim()) {
       assigned = true;
       const sameSeat = room?.code === message.code && side === message.side;
       side = message.side;
-      if (!sameSeat) { flipped = side === 'black'; cancelAssist(); sandbox = null; selected = null; }
+      if (!sameSeat) { resetReplay(); flipped = side === 'black'; cancelAssist(); sandbox = null; selected = null; }
       $('server').value = base;
       $('room-code').value = message.code;
       try { sessionStorage.setItem(storageKey, JSON.stringify({ base, code: message.code, token: message.token })); }
@@ -733,18 +869,20 @@ function connect(action, address = $('server').value.trim()) {
       clockReceivedAt = performance.now();
       const positionChanged = !previous || previous.code !== room.code || previous.revision !== room.revision;
       const resultChanged = resultKey(previous?.game.result) !== resultKey(game.result);
+      if (replay && (positionChanged || resultChanged || previous?.round !== room.round
+        || assistPositionKey(game) !== assistPositionKey(replay.frames.at(-1)))) resetReplay();
       const wasMovePending = movePending;
       connecting = false;
       actionSending = false;
       let sandboxRebased = false;
       if (sandbox && previous?.round !== room.round) sandbox = null;
-      if (sandbox && positionChanged) {
+      if (sandbox && !replay && positionChanged) {
         sandbox = rebaseSandbox(sandbox, game, room.revision);
         sandboxRebased = true;
       }
-      if (sandbox && game.result) sandbox = null;
+      if (sandbox && !replay && game.result) sandbox = null;
       if (positionChanged || resultChanged) movePending = false;
-      if (positionChanged || game.result || (!sandbox && (!roomIsPlaying(room) || game.turn !== side || pendingVote()))) selected = null;
+      if (!replay && (positionChanged || game.result || (!sandbox && (!roomIsPlaying(room) || game.turn !== side || pendingVote())))) selected = null;
       if (game.result) notify(resultDescription(game.result));
       else if (sandboxRebased) notify('真实棋局已更新，沙盘推演已重置');
       else if (positionChanged) notify(roomIsPlaying(room) ? (wasMovePending ? '落子成功，轮到对方' : '棋盘已同步，按回合落子') : '准备阶段；双方准备后倒数开局');
@@ -791,6 +929,7 @@ function connect(action, address = $('server').value.trim()) {
 }
 
 $('restart').addEventListener('click', () => {
+  resetReplay();
   if (room) { cancelAssist(); roomControls.open(); render(); return; }
   cancelAi();
   game = createInitialGame();
@@ -802,6 +941,7 @@ $('restart').addEventListener('click', () => {
   if (aiHumanSide) void playAiMove();
 });
 $('undo').addEventListener('click', () => {
+  if (replay) return;
   if (room) return requestAction('undo');
   if (aiHumanSide) {
     const count = aiUndoCount(game, aiHumanSide);
@@ -832,7 +972,7 @@ $('resign').addEventListener('click', () => {
   render();
 });
 function requestAction(action) {
-  if (!room) return;
+  if (!room || replay) return;
   actionSending = true;
   if (!sandbox) selected = null;
   send({ type: 'action-request', action, revision: room.revision });
@@ -842,9 +982,12 @@ function requestAction(action) {
 $('sandbox-toggle').addEventListener('click', () => {
   if (sandbox) {
     sandbox = null;
-    notify('已退出沙盘，回到最新真实棋局');
+    notify(replay ? `已退出沙盘，回到复盘第 ${replay.index} 步；可继续播放` : '已退出沙盘，回到最新真实棋局');
   } else {
-    sandbox = createSandbox(game, room?.revision ?? null);
+    if (replay) {
+      pauseReplay();
+      sandbox = createSandbox({ ...replayGame(replay), result: null }, replay.index);
+    } else sandbox = createSandbox(game, room?.revision ?? null);
     notify('');
   }
   selected = null;
@@ -905,6 +1048,32 @@ $('accept').addEventListener('click', () => answerVote(true));
 $('decline').addEventListener('click', () => answerVote(false));
 $('result-dismiss').addEventListener('click', closeResult);
 $('result-summary').addEventListener('click', openResult);
+$('replay-start').addEventListener('click', openReplay);
+$('replay-open').addEventListener('click', openReplay);
+$('replay-first').addEventListener('click', () => moveReplay(0));
+$('replay-prev').addEventListener('click', () => { if (replay) moveReplay(replay.index - 1); });
+$('replay-next').addEventListener('click', () => { if (replay) moveReplay(replay.index + 1); });
+$('replay-last').addEventListener('click', () => { if (replay) moveReplay(replay.length); });
+$('replay-position').addEventListener('input', () => moveReplay(Number($('replay-position').value)));
+$('replay-play').addEventListener('click', toggleReplayPlayback);
+$('replay-exit').addEventListener('click', () => {
+  resetReplay();
+  notify('已退出复盘，回到本局终局');
+  render();
+  $('replay-open').focus({ preventScroll: true });
+});
+function changeReplaySpeed() {
+  if (sandbox) return;
+  const wasPlaying = replayPlaying;
+  pauseReplay();
+  try {
+    replayIntervalMs = replayDelay();
+    if (replay && wasPlaying) { replayPlaying = true; scheduleReplay(); }
+  } catch (error) { notify(error.message, true); }
+  render();
+}
+$('replay-speed').addEventListener('change', changeReplaySpeed);
+$('replay-custom').addEventListener('change', changeReplaySpeed);
 window.addEventListener('keydown', (event) => {
   if ($('restart-config').open) return;
   if ($('result-overlay').hidden) return;
@@ -913,7 +1082,9 @@ window.addEventListener('keydown', (event) => {
     closeResult();
   } else if (event.key === 'Tab' && !pendingVote()) {
     event.preventDefault();
-    $('result-dismiss').focus({ preventScroll: true });
+    const next = !$('replay-start').disabled && document.activeElement === $('result-dismiss')
+      ? $('replay-start') : $('result-dismiss');
+    next.focus({ preventScroll: true });
   }
 });
 

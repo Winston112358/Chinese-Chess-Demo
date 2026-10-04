@@ -68,7 +68,34 @@
             <button id="ready-button" type="button">准备好了</button>
           </section>
           <button id="result-summary" class="result-summary" type="button" hidden></button>
+          <button id="replay-open" type="button" hidden>复盘本局</button>
           <p id="sandbox-banner" class="sandbox-banner" role="status" hidden></p>
+        </section>
+        <section id="replay-panel" class="panel replay-panel" aria-labelledby="replay-heading" hidden>
+          <h2 id="replay-heading">棋局复盘</h2>
+          <p id="replay-status" class="hint" role="status"></p>
+          <div class="replay-controls">
+            <button id="replay-first" type="button">回到开局</button>
+            <button id="replay-prev" type="button">上一步</button>
+            <button id="replay-play" type="button">播放</button>
+            <button id="replay-next" type="button">下一步</button>
+            <button id="replay-last" type="button">最后一步</button>
+          </div>
+          <label for="replay-position">回放进度</label>
+          <input id="replay-position" type="range" min="0" max="0" step="1" value="0">
+          <div class="replay-speed-controls">
+            <label for="replay-speed">播放间隔</label>
+            <select id="replay-speed">
+              <option value="1">1 秒一步</option>
+              <option value="2">2 秒一步</option>
+              <option value="custom">自定义秒数</option>
+            </select>
+            <label id="replay-custom-label" for="replay-custom" hidden>每步秒数
+              <input id="replay-custom" type="number" min="0.1" max="3600" step="0.1" value="3" inputmode="decimal">
+            </label>
+          </div>
+          <p class="hint">点击走棋记录可定位。进入沙盘会暂停回放，退出沙盘后可继续播放。</p>
+          <button id="replay-exit" type="button">退出复盘</button>
         </section>
         <section class="panel board-info-panel" aria-label="棋盘提示与吃子">
           <p id="danger-legend" class="hint" hidden>蓝紫虚线圈：对手下一步可合法吃到的己方棋子，仅提示当前局面。</p>
@@ -227,10 +254,15 @@
           <p class="appearance-note">房主和参与者可各自选择。此设备会记住你的外观偏好。</p>
           <p id="appearance-status" class="appearance-status" role="status" aria-live="polite"></p>
         </section>
-        <section class="panel">
+        <section class="panel move-history-panel">
           <h2>吃子与走棋记录</h2>
           <p id="captures">尚未吃子</p>
           <ol id="history" aria-label="走棋记录"></ol>
+        </section>
+        <section class="panel endgame-panel" aria-labelledby="endgame-heading">
+          <h2 id="endgame-heading">残局模式</h2>
+          <button id="endgame-placeholder" type="button" data-mode="endgame" disabled>残局模式（待定）</button>
+          <p class="hint">入口已预留，玩法与残局配置待定。</p>
         </section>
         <section class="panel">
           <h2>对局说明</h2>
@@ -297,7 +329,10 @@
     <section class="result-card" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="game-result">
       <h2 id="result-title"></h2>
       <p id="game-result" class="game-result"></p>
-      <button id="result-dismiss" type="button">查看棋盘</button>
+      <div class="result-actions">
+        <button id="replay-start" type="button">复盘本局</button>
+        <button id="result-dismiss" type="button">查看棋盘</button>
+      </div>
     </section>
   </div>
   <section id="vote-popup" class="vote-popup" role="dialog" aria-modal="false" aria-labelledby="vote-title" hidden>

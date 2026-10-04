@@ -7,6 +7,8 @@ import * as sandbox from '../src/shared/sandbox.js';
 import * as analysis from '../src/shared/analysis.js';
 import * as ai from '../web/ai-game.js';
 import * as notation from '../web/move-notation.js';
+import * as moveRecords from '../web/move-records.js';
+import * as replay from '../src/shared/replay.js';
 import * as roomControls from '../web/room-controls.js';
 
 const [appSource, html] = await Promise.all([
@@ -130,6 +132,8 @@ async function fixture(t, { serverInfo = { addresses: [] }, rulesOverrides = {} 
     '/shared/analysis.js': analysis,
     '/ai-game.js': { ...ai, createAiSearch: (options = {}) => ai.createAiSearch({ ...options, fetchImpl: fetch }) },
     '/move-notation.js': notation,
+    '/move-records.js': moveRecords,
+    '/shared/replay.js': replay,
     '/room-controls.js': roomControls,
     '/board.js': { renderBoard: (_element, options) => { boardView = options; } },
     '/game-tools.js': { renderCaptured() {} },
