@@ -1,6 +1,9 @@
+import { getAutomaticResult } from './adjudication.js';
+
 export const COLS = 9;
 export const ROWS = 10;
 export const SIDE_NAMES = { red: '红方', black: '黑方' };
+// Canonical names use simplified 车; local fonts may display traditional 俥/車.
 export const PIECE_NAMES = {
   red: { general: '帅', advisor: '仕', elephant: '相', horse: '马', rook: '车', cannon: '炮', pawn: '兵' },
   black: { general: '将', advisor: '士', elephant: '象', horse: '马', rook: '车', cannon: '砲', pawn: '卒' },
@@ -11,6 +14,12 @@ export const indexOf = ({ x, y }) => y * COLS + x;
 export const pieceAt = (board, point) => board[indexOf(point)];
 export const insideBoard = (point) => point && Number.isInteger(point.x) && Number.isInteger(point.y)
   && point.x >= 0 && point.x < COLS && point.y >= 0 && point.y < ROWS;
+
+const MOVE_RESULT_REASONS = new Set([
+  'general-captured', 'checkmate', 'stalemate', 'repetition', 'perpetual-check',
+  'perpetual-chase', 'no-capture', 'insufficient-material',
+]);
+export const canUndoResult = (result) => !result || MOVE_RESULT_REASONS.has(result.reason);
 
 export function createInitialGame() {
   const board = Array(COLS * ROWS).fill(null);
@@ -216,7 +225,9 @@ export function getGameResult(game) {
     if (game.board[index]?.side !== game.turn) continue;
     const from = { x: index % COLS, y: Math.floor(index / COLS) };
     for (const to of candidateDestinations(game.board, from)) {
-      if (validateMove(activeGame, from, to).ok) return null;
+      if (validateMove(activeGame, from, to).ok) {
+        return getAutomaticResult(game, { cols: COLS, isInCheck, canCapture });
+      }
     }
   }
   return {
@@ -224,6 +235,14 @@ export function getGameResult(game) {
     loser: game.turn,
     reason: isInCheck(game.board, game.turn) ? 'checkmate' : 'stalemate',
   };
+}
+
+function canCapture(board, from, to) {
+  const piece = board[from];
+  if (!piece || !board[to] || piece.side === board[to].side) return false;
+  return validateMove({ board, turn: piece.side, result: null },
+    { x: from % COLS, y: Math.floor(from / COLS) },
+    { x: to % COLS, y: Math.floor(to / COLS) }).ok;
 }
 
 export function applyMove(game, from, to) {

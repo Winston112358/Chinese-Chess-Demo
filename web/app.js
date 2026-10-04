@@ -1,10 +1,11 @@
-import { createInitialGame, applyMove, validateMove, undoMove, legalMoves, isInCheck, pieceAt, PIECE_NAMES, SIDE_NAMES } from '/shared/rules.js';
+import { createInitialGame, applyMove, validateMove, undoMove, canUndoResult, legalMoves, isInCheck, pieceAt, PIECE_NAMES, SIDE_NAMES } from '/shared/rules.js';
 import { renderBoard } from '/board.js';
 import { createSandbox, rebaseSandbox, sandboxApplyMove, sandboxUndo } from '/shared/sandbox.js';
 import { dangerousPieces } from '/shared/analysis.js';
 import { renderCaptured } from '/game-tools.js';
 import { aiUndoCount, createAiSearch } from '/ai-game.js';
-import { createRoomControls, roomIsPlaying, restartDescription, readTimes } from '/room-controls.js';
+import { chineseMoveNotation } from '/move-notation.js';
+import { createRoomControls, roomIsPlaying, restartDescription, readTimes, readMoveTime } from '/room-controls.js';
 
 const $ = (id) => document.getElementById(id);
 let localGame = createInitialGame();
@@ -18,6 +19,7 @@ let connecting = false;
 let movePending = false;
 let connectionTimer;
 let clockReceivedAt = 0;
+let clockExpired = false;
 let sandbox = null;
 let actionSending = false;
 let dangerCache = { board: null, side: null, points: [] };
@@ -31,6 +33,7 @@ let aiInfoLoading = false;
 const aiSearch = createAiSearch();
 const assistSearch = createAiSearch();
 let assistJob = null;
+let assistSuggestion = null;
 const storageKey = 'xiangqi-last-room';
 const ACTION_NAMES = { undo: '单步悔棋', draw: '求和', resign: '认输', restart: '重新开局' };
 const roomControls = createRoomControls({
@@ -62,13 +65,29 @@ function notify(message, error = false) {
   $('message').classList.toggle('error', error);
 }
 
+function notifyAssist(message, error = false) {
+  $('ai-assist-message').textContent = message;
+  $('ai-assist-message').classList.toggle('error', error);
+}
+
 function resultDescription(result) {
-  if (result.reason === 'draw') return '双方同意和棋，对局结束。';
+  if (result.winner === null) {
+    const reasons = {
+      draw: '双方同意和棋',
+      repetition: '重复局面，判和',
+      'no-capture': '达到无吃子自然限着，判和',
+      'insufficient-material': '双方均无进攻子力，判和',
+    };
+    return `${reasons[result.reason] || '和棋'}，对局结束。`;
+  }
   const reasons = {
     checkmate: `${SIDE_NAMES[result.loser]}被将死`,
     stalemate: `${SIDE_NAMES[result.loser]}无合法着法（困毙）`,
     'general-captured': `${SIDE_NAMES[result.loser]}将帅被吃`,
     timeout: `${SIDE_NAMES[result.loser]}超时`,
+    'move-timeout': `${SIDE_NAMES[result.loser]}单步超时`,
+    'perpetual-check': `${SIDE_NAMES[result.loser]}长将违例`,
+    'perpetual-chase': `${SIDE_NAMES[result.loser]}长捉违例`,
     resignation: `${SIDE_NAMES[result.loser]}认输${room ? '（双方已同意）' : ''}`,
   };
   return `${SIDE_NAMES[result.winner]}获胜：${reasons[result.reason] || '对局结束'}。`;
@@ -113,7 +132,7 @@ function renderResult() {
   const key = result ? `${room ? `room:${room.code}` : aiHumanSide ? 'ai' : 'local'}:${resultKey(result)}` : '';
   $('result-summary').hidden = !result;
   $('result-summary').textContent = result ? resultDescription(result) : '';
-  $('result-title').textContent = result ? (result.reason === 'draw' ? '和棋' : `${SIDE_NAMES[result.winner]}获胜`) : '';
+  $('result-title').textContent = result ? (result.winner === null ? '和棋' : `${SIDE_NAMES[result.winner]}获胜`) : '';
   $('game-result').hidden = !result;
   $('game-result').textContent = result ? resultDescription(result) : '';
   $('result-overlay').querySelector('.result-card').setAttribute('aria-modal', String(!pendingVote()));
@@ -134,29 +153,54 @@ function renderClocks() {
   const clock = room?.clock;
   $('clock-panel').hidden = !clock || clock.enabled === false;
   $('clock-details').hidden = !clock;
-  if (!clock) return;
+  if (!clock) {
+    const changed = clockExpired;
+    clockExpired = false;
+    return changed;
+  }
   const elapsed = Math.max(0, performance.now() - clockReceivedAt);
-  let awaitingResult = false;
+  const moveTimed = clock.enabled !== false && clock.moveTimeMs != null;
+  const movingSide = clock.runningSide || game.turn;
+  const runningClock = clock.enabled !== false && clock.started && clock.runningSide && !game.result;
+  const charged = runningClock ? Math.max(0, Math.min(elapsed, clock.remainingMs[clock.runningSide],
+    moveTimed ? clock.moveRemainingMs ?? clock.moveTimeMs : Infinity)) : 0;
+  const moveRemaining = moveTimed ? Math.max(0, (clock.moveRemainingMs ?? clock.moveTimeMs)
+    - charged) : null;
   for (const color of ['red', 'black']) {
-    const running = clock.runningSide === color && !game.result;
-    const remaining = Math.max(0, clock.remainingMs[color] - (running ? elapsed : 0));
+    const running = clock.started && clock.runningSide === color && !game.result;
+    const remaining = Math.max(0, clock.remainingMs[color] - (running ? charged : 0));
     const text = formatTime(remaining);
     if ($(`time-${color}`).textContent !== text) $(`time-${color}`).textContent = text;
     $(`clock-${color}`).classList.toggle('running', running);
     $(`clock-${color}`).classList.toggle('low', clock.started && !game.result && remaining <= 60_000);
-    if (running && remaining === 0) awaitingResult = true;
+    const moveText = !moveTimed ? '未启用' : color === movingSide ? formatTime(moveRemaining) : '—';
+    if ($(`move-time-${color}`).textContent !== moveText) $(`move-time-${color}`).textContent = moveText;
+    $(`clock-${color}`).classList.toggle('move-low', Boolean(running && moveTimed && moveRemaining <= 10_000));
   }
+  const expiredReason = clockUnavailableReason();
+  const awaitingResult = Boolean(expiredReason);
+  const expiryChanged = awaitingResult !== clockExpired;
+  clockExpired = awaitingResult;
   const minutes = (milliseconds) => String(Number((milliseconds / 60_000).toFixed(2)));
-  const summary = clock.enabled === false ? '本局不计时' : `房间时限：红方 ${minutes(clock.initialMs.red)} 分钟 · 黑方 ${minutes(clock.initialMs.black)} 分钟`;
+  const summary = clock.enabled === false ? '本局不计时' : `房间时限：红方 ${minutes(clock.initialMs.red)} 分钟 · 黑方 ${minutes(clock.initialMs.black)} 分钟 · ${moveTimed ? `每步 ${clock.moveTimeMs / 1000} 秒` : '单步不限时'}`;
   if ($('time-control-summary').textContent !== summary) $('time-control-summary').textContent = summary;
   let info;
   if (game.result) info = '对局已结束。可配置下一局并请求对方同意。';
   else if (!roomIsPlaying(room)) info = '双方准备并倒数结束后开局；准备和倒数不扣时。';
   else if (clock.enabled === false) info = '本局不限时；红方先走。';
   else if (socket?.readyState !== WebSocket.OPEN) info = '连接已断开，计时继续；恢复房间后同步剩余时间。';
-  else if (awaitingResult) info = '剩余时间已到零，等待服务器确认对局结果。';
+  else if (awaitingResult) info = `${expiredReason}。`;
   else info = `${SIDE_NAMES[clock.runningSide || game.turn]}计时中；沙盘、协商与断线均不停钟。`;
   if ($('clock-info').textContent !== info) $('clock-info').textContent = info;
+  if (awaitingResult) {
+    selected = null;
+    if (assistJob || assistSuggestion) {
+      cancelAssist();
+      notifyAssist(`${expiredReason}，已取消 AI 辅助。`);
+    }
+    renderAi();
+  }
+  return expiryChanged;
 }
 
 function pendingVote() {
@@ -197,7 +241,11 @@ function dangerPoints(view) {
 function render() {
   if (assistJob && !currentAssist(assistJob)) {
     cancelAssist();
-    if ($('message').textContent.startsWith('皮卡鱼正在分析')) notify('对局状态已变化，已取消 AI 辅助');
+    notifyAssist('对局状态已变化，已取消 AI 辅助');
+  }
+  if (assistSuggestion && (assistUnavailableReason() || !sameAssistPosition(assistSuggestion))) {
+    cancelAssist();
+    notifyAssist('局面已变化，请重新构思。');
   }
   const connected = socket?.readyState === WebSocket.OPEN;
   const bothOnline = room?.players.red && room?.players.black;
@@ -215,8 +263,7 @@ function render() {
   if (!sandbox && aiHumanSide && !game.result && game.turn !== aiHumanSide) {
     $('turn').textContent += aiThinking ? ' · 皮卡鱼思考中…' : ' · 等待电脑走棋';
   }
-  if (assistJob) $('turn').textContent += ' · AI 辅助分析中…';
-  const undoable = !game.result || ['checkmate', 'stalemate', 'general-captured'].includes(game.result.reason);
+  const undoable = canUndoResult(game.result);
   $('undo').textContent = room ? '请求单步悔棋' : aiHumanSide ? '撤回我的上一步' : '悔棋一步';
   $('undo').disabled = !(aiHumanSide ? aiUndoCount(game, aiHumanSide) : game.history.length) || !undoable || connecting || (room && !canNegotiate);
   $('draw').disabled = !canNegotiate || Boolean(game.result);
@@ -265,7 +312,7 @@ function render() {
   renderBoard($('board'), {
     game: view, selected, flipped,
     context: `${room ? `room:${room.code}` : aiHumanSide ? `ai:${aiHumanSide}` : 'local'}:${sandbox ? 'sandbox' : 'real'}`,
-    canSelect: !view.result && (sandbox ? true : ready && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side) && (!aiHumanSide || game.turn === aiHumanSide)),
+    canSelect: !view.result && (sandbox ? true : ready && !clockUnavailableReason() && !connecting && !movePending && !actionSending && !request && (!room || game.turn === side) && (!aiHumanSide || game.turn === aiHumanSide)),
     moves: selected ? legalMoves(view, selected) : [],
     danger: dangerPoints(view),
     onClick: clickPoint,
@@ -312,6 +359,8 @@ function clickPoint(point) {
   if (room && socket?.readyState !== WebSocket.OPEN) return notify('连接已断开，请恢复房间后落子；计时继续', true);
   if (room && !roomIsPlaying(room)) return;
   if (room && game.turn !== side) return notify('现在是对手的回合', true);
+  const clockReason = clockUnavailableReason();
+  if (clockReason) return notify(clockReason, true);
   if (aiHumanSide && game.turn !== aiHumanSide) return notify(aiThinking ? '皮卡鱼正在思考，你可以进入沙盘推演' : '等待电脑走棋，请点击“重试电脑走棋”', Boolean(aiError));
   const piece = pieceAt(game.board, point);
   if (piece?.side === game.turn) {
@@ -342,8 +391,14 @@ function renderAi() {
   const assistReason = assistUnavailableReason();
   $('ai-assist').hidden = Boolean(aiHumanSide);
   $('ai-assist').disabled = !assistJob && Boolean(assistReason);
-  $('ai-assist').textContent = assistJob ? '取消 AI 辅助' : 'AI 帮我走一步';
-  $('ai-assist').title = assistJob ? '取消本次分析，继续自行走棋' : assistReason || '分析当前局面并直接走一步；联机分析期间继续计时';
+  $('ai-assist').textContent = assistJob?.mode === 'move' ? '取消 AI 辅助' : 'AI 帮我走一步';
+  $('ai-assist').title = assistJob?.mode === 'move' ? '取消本次分析，继续自行走棋'
+    : assistReason || (assistSuggestion ? '执行当前显示的建议着法；联机提交期间继续计时' : '分析当前局面并直接走一步；联机分析期间继续计时');
+  $('ai-suggest').hidden = Boolean(aiHumanSide);
+  $('ai-suggest').disabled = !assistJob && Boolean(assistReason);
+  $('ai-suggest').textContent = assistJob?.mode === 'suggest' ? '取消 AI 构思' : 'AI 帮我构思一步';
+  $('ai-suggest').title = assistJob?.mode === 'suggest' ? '取消本次构思，继续自行走棋' : assistReason || '给出中文着法供你参考，棋子不会自动移动；联机分析期间继续计时';
+  $('ai-assist-message').hidden = Boolean(aiHumanSide);
   $('ai-start').disabled = connecting || aiInfoLoading || aiInfo?.available === false;
   $('ai-start').textContent = aiHumanSide ? '按所选执子重新开局' : '开始人机对战';
   $('ai-retry').hidden = !aiHumanSide || !aiError || Boolean(game.result);
@@ -370,6 +425,8 @@ function assistUnavailableReason() {
   if (room && socket?.readyState !== WebSocket.OPEN) return '请先恢复房间连接';
   if (room && !roomIsPlaying(room)) return '等待双方准备并倒数结束后才能走棋';
   if (room && game.turn !== side) return '轮到你走棋时才能使用 AI 辅助';
+  const clockReason = clockUnavailableReason();
+  if (clockReason) return clockReason;
   if (aiInfoLoading || !aiInfo) return '正在检查皮卡鱼…';
   if (!aiInfo.available) return aiInfo.error || '皮卡鱼不可用，请在右侧重新检查';
   return '';
@@ -377,49 +434,110 @@ function assistUnavailableReason() {
 
 function currentAssist(job) {
   if (assistJob !== job || assistUnavailableReason()) return false;
+  return sameAssistPosition(job);
+}
+
+function sameAssistPosition(job) {
   // Room state messages rebuild game objects even when only a player reconnects.
   return room
-    ? job.socket === socket && job.code === room.code && job.revision === room.revision && job.side === side
-    : job.code === null && job.position === game;
+    ? job.socket === socket && job.code === room.code && job.revision === room.revision && job.round === room.round
+      && job.side === side && job.positionKey === assistPositionKey(game)
+    : job.code === null && job.position === game && job.positionKey === assistPositionKey(game);
+}
+
+function assistPositionKey(position) {
+  return JSON.stringify([position.board, position.turn, position.history, position.result]);
+}
+
+function clockUnavailableReason() {
+  const clock = room?.clock;
+  if (!clock || clock.enabled === false || !clock.started || !roomIsPlaying(room)
+    || (clock.runningSide && clock.runningSide !== game.turn) || game.result) return '';
+  const elapsed = clock.runningSide ? Math.max(0, performance.now() - clockReceivedAt) : 0;
+  const total = clock.remainingMs[game.turn];
+  const move = clock.moveTimeMs != null ? clock.moveRemainingMs ?? clock.moveTimeMs : null;
+  if (move != null && move <= elapsed && move < total) return '本步剩余时间已到零，请等待服务器确认对局结果';
+  if (total <= elapsed) return '剩余总时间已到零，请等待服务器确认对局结果';
+  return '';
 }
 
 function cancelAssist() {
   assistSearch.cancel();
   assistJob = null;
+  assistSuggestion = null;
+  notifyAssist('');
 }
 
-async function assistMove() {
-  if (assistJob) {
-    cancelAssist();
-    notify('已取消 AI 辅助，可以自行走棋');
+function playAssistMove(job, move, notation) {
+  if (assistUnavailableReason() || !sameAssistPosition(job)) throw new Error('局面已变化，请重新构思');
+  const result = room ? validateMove(game, move.from, move.to) : applyMove(game, move.from, move.to);
+  if (!result.ok) throw new Error('皮卡鱼返回的着法不符合本局规则，请重试');
+  // Consume the suggestion before changing local state or submitting a move.
+  assistJob = null;
+  assistSuggestion = null;
+  selected = null;
+  if (room) {
+    movePending = true;
+    send({ type: 'move', from: move.from, to: move.to, revision: job.revision });
+    notifyAssist(`AI 已选好：${notation}，正在提交落子…`);
+  } else {
+    game = localGame = result.game;
+    notifyAssist(`AI 已代走：${notation}，${game.result ? resultDescription(game.result) : '轮到对方'}`);
+  }
+}
+
+async function assistMove(mode = 'move') {
+  if (assistJob && currentAssist(assistJob)) {
+    if (assistJob.mode === mode) {
+      cancelAssist();
+      notifyAssist('已取消 AI 辅助，可以自行走棋');
+    } else {
+      // Reuse the same current-position search: aborting and immediately
+      // restarting could hit the engine slot while its old process exits.
+      assistJob.mode = mode;
+      if (mode === 'move') selected = null;
+      notifyAssist(mode === 'move' ? '分析完成后将走一步，可点击按钮取消。' : '正在构思，棋子不会自动移动。');
+    }
     render();
     return;
   }
+  if (mode === 'move' && assistSuggestion && !assistUnavailableReason() && sameAssistPosition(assistSuggestion)) {
+    const suggestion = assistSuggestion;
+    try {
+      playAssistMove(suggestion, suggestion.move, suggestion.notation);
+    } catch (error) {
+      cancelAssist();
+      notifyAssist(`AI 辅助失败：${error.message}`, true);
+    }
+    render();
+    return;
+  }
+  cancelAssist();
   const reason = assistUnavailableReason();
-  if (reason) return notify(reason, true);
-  const job = { position: game, code: room?.code ?? null, revision: room?.revision, socket, side };
+  if (reason) return notifyAssist(reason, true);
+  const job = { position: game, positionKey: assistPositionKey(game), code: room?.code ?? null,
+    revision: room?.revision, round: room?.round, socket, side, mode };
   assistJob = job;
-  selected = null;
-  notify(`皮卡鱼正在分析当前局面，完成后自动走一步${room ? '；计时继续' : ''}。可点击按钮取消。`);
+  if (mode === 'move') selected = null;
+  notifyAssist(mode === 'suggest' ? `正在构思，棋子不会自动移动${room ? '；计时继续' : ''}。` : '');
   render();
   try {
     const move = await assistSearch.search(job.position);
     if (!move || !currentAssist(job)) return;
-    const result = room ? validateMove(game, move.from, move.to) : applyMove(game, move.from, move.to);
+    const result = validateMove(game, move.from, move.to);
     if (!result.ok) throw new Error('皮卡鱼返回的着法不符合本局规则，请重试');
-    assistJob = null;
-    selected = null;
-    if (room) {
-      movePending = true;
-      send({ type: 'move', from: move.from, to: move.to, revision: job.revision });
-      notify('AI 已选好着法，正在提交落子…');
-    } else {
-      game = localGame = result.game;
-      notify(game.result ? resultDescription(game.result) : 'AI 已代走一步，轮到对方');
+    const chosenMove = { from: { x: move.from.x, y: move.from.y }, to: { x: move.to.x, y: move.to.y } };
+    const notation = chineseMoveNotation(job.position, chosenMove);
+    if (job.mode === 'suggest') {
+      assistJob = null;
+      assistSuggestion = { ...job, move: chosenMove, notation };
+      notifyAssist(`${SIDE_NAMES[job.position.turn]}建议：${notation}。可自行走棋，或点击“AI 帮我走一步”。`);
+      return;
     }
+    playAssistMove(job, chosenMove, notation);
   } catch (error) {
     if (!currentAssist(job)) return;
-    notify(`AI 辅助失败：${error.message || '无法连接皮卡鱼，请重试'}`, true);
+    notifyAssist(`AI 辅助失败：${error.message || '无法连接皮卡鱼，请重试'}`, true);
   } finally {
     // A cancelled request must not clear a newer search or its status message.
     if (assistJob === job) assistJob = null;
@@ -505,6 +623,7 @@ $('ai-start').addEventListener('click', () => {
 $('ai-retry').addEventListener('click', () => { notify('正在重试电脑走棋…'); void playAiMove(); });
 $('ai-refresh').addEventListener('click', () => { void checkAi(); });
 $('ai-assist').addEventListener('click', () => { void assistMove(); });
+$('ai-suggest').addEventListener('click', () => { void assistMove('suggest'); });
 
 function send(message) {
   if (socket?.readyState !== WebSocket.OPEN) { movePending = false; notify('连接已断开，请恢复房间', true); return; }
@@ -585,11 +704,13 @@ function connect(action, address = $('server').value.trim()) {
   ws.addEventListener('message', (event) => {
     if (socket !== ws) return;
     const message = JSON.parse(event.data);
+    let revealReady = false;
     if (message.type === 'clock') {
       if (room && message.code === room.code && message.revision === room.revision) {
         room.clock = message.clock;
         clockReceivedAt = performance.now();
-        renderClocks();
+        if (renderClocks()) render();
+        else renderAi();
       }
       return;
     }
@@ -606,6 +727,8 @@ function connect(action, address = $('server').value.trim()) {
     } else if (message.type === 'state') {
       const previous = room;
       room = message.room;
+      revealReady = room.phase === 'preparing' && (!previous || previous.code !== room.code
+        || previous.round !== room.round || previous.phase !== 'preparing');
       game = room.game;
       clockReceivedAt = performance.now();
       const positionChanged = !previous || previous.code !== room.code || previous.revision !== room.revision;
@@ -646,6 +769,7 @@ function connect(action, address = $('server').value.trim()) {
       }
     }
     render();
+    if (revealReady) $('ready-panel').scrollIntoView?.({ block: 'nearest', behavior: 'instant' });
   });
   ws.addEventListener('error', () => {
     if (socket !== ws) return;
@@ -751,9 +875,13 @@ $('local').addEventListener('click', () => {
   render();
 });
 $('create').addEventListener('click', () => {
-  let timeControl;
-  try { timeControl = $('timed-toggle').checked ? readTimes(document) : undefined; } catch (error) { notify(error.message, true); return; }
-  connect({ type: 'create', timeControl, timed: $('timed-toggle').checked });
+  const timed = $('timed-toggle').checked;
+  let timeControl, moveTimeMs;
+  try {
+    timeControl = timed ? readTimes(document) : undefined;
+    moveTimeMs = readMoveTime(document, '', timed);
+  } catch (error) { notify(error.message, true); return; }
+  connect({ type: 'create', timeControl, timed, moveTimeMs });
 });
 $('join').addEventListener('click', () => {
   const code = $('room-code').value.trim().toUpperCase();
@@ -864,6 +992,6 @@ $('refresh-addresses').addEventListener('click', () => { void refreshAddresses()
 void refreshAddresses();
 render();
 void checkAi();
-setInterval(renderClocks, 100);
+setInterval(() => { if (renderClocks()) render(); }, 100);
 const saved = savedSeat();
 if (saved && saved.base === location.origin) connect({ type: 'resume', code: saved.code, token: saved.token }, saved.base);

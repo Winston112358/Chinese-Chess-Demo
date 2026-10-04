@@ -71,6 +71,17 @@ test('untrusted positions and illegal histories are rejected before starting the
   }
 });
 
+test('a repeated-position draw prevents an AI search and terminal histories cannot accept extra moves', async (t) => {
+  const cycle = [[1, 9, 2, 7], [1, 0, 2, 2], [2, 7, 1, 9], [2, 2, 1, 0]];
+  const history = [...cycle, ...cycle].map(([x, y, tx, ty]) => ({
+    from: { x, y }, to: { x: tx, y: ty },
+  }));
+  // This engine would hang if the terminal position reached the search process.
+  const engine = fakeEngine(t, { mode: 'hang', timeoutMs: 300 });
+  await assert.rejects(engine.bestMove(history), { code: 'GAME_OVER', statusCode: 409 });
+  await assert.rejects(engine.bestMove([...history, redMove]), { code: 'INVALID_HISTORY', statusCode: 400 });
+});
+
 test('missing binary and network have clear availability errors', async (t) => {
   const binaryMissing = createPikafish({ executablePath: join(import.meta.dirname, 'missing-pikafish.exe') });
   const networkMissing = createPikafish({ executablePath: process.execPath, networkPath: join(import.meta.dirname, 'missing-pikafish.nnue') });

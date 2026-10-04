@@ -1,5 +1,5 @@
 import { COLS, ROWS, PIECE_NAMES, SIDE_NAMES, indexOf } from '/shared/rules.js';
-import { pieceGlyph } from '/piece-glyph.js';
+import { pieceGlyph, setPieceGlyph, setChessText } from '/piece-glyph.js';
 
 const samePoint = (a, b) => a && b && a.x === b.x && a.y === b.y;
 const line = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
@@ -49,8 +49,10 @@ function gridSvg() {
     else lines += line(px, 30, px, 270) + line(px, 330, px, 570);
   }
   for (const y of [30, 450]) lines += line(210, y, 330, y + 120) + line(330, y, 210, y + 120);
-  return `<svg viewBox="0 0 540 600" aria-hidden="true"><g class="board-grid" stroke-width="1.5">${lines}</g>
-    <g class="board-river" font-size="48" text-anchor="middle"><text x="150" y="314.4">楚 河</text><text x="390" y="314.4">汉 界</text></g></svg>`;
+  return `<svg viewBox="0 0 540 600" aria-hidden="true"><g class="board-grid-halo" stroke-width="3">${lines}</g><g class="board-grid" stroke-width="1.5">${lines}</g>
+    <g class="board-river" text-anchor="middle">${['楚', '河', '汉', '界'].map((character, index) =>
+      `<text x="${[102, 198, 342, 438][index]}" y="314.4" font-size="48" data-character="${character}" data-letter-size="48" data-center-x="${[102, 198, 342, 438][index]}" data-center-y="300">${character}</text>`
+    ).join('')}</g></svg>`;
 }
 
 export function renderBoard(element, { game, selected, moves, flipped, canSelect, onClick, danger = [], context = 'real' }) {
@@ -68,6 +70,9 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
       element.append(button);
     }
     buttons = element.querySelectorAll('.point');
+  }
+  for (const river of element.querySelectorAll('.board-river text')) {
+    setChessText(river, river.getAttribute('data-character'), element.dataset.font);
   }
   const board = game.board.map((piece) => piece ? `${piece.side}:${piece.type}` : null);
   const move = singleMove(state, game, board, context, flipped);
@@ -108,10 +113,10 @@ export function renderBoard(element, { game, selected, moves, flipped, canSelect
       if (piece) {
         let glyph = button.querySelector('.piece-glyph');
         if (!glyph) {
-          glyph = pieceGlyph(PIECE_NAMES[piece.side][piece.type]);
+          glyph = pieceGlyph(PIECE_NAMES[piece.side][piece.type], piece.side);
           button.replaceChildren(glyph);
         } else {
-          glyph.firstElementChild.textContent = PIECE_NAMES[piece.side][piece.type];
+          setPieceGlyph(glyph, PIECE_NAMES[piece.side][piece.type], element.dataset.font, piece.side);
         }
       } else button.replaceChildren();
       button.setAttribute('aria-label', `${name}，第${x + 1}列第${y + 1}行${threatened ? '，有被吃危险' : ''}`);

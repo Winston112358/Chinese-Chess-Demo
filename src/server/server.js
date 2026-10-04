@@ -15,17 +15,42 @@ const assets = new Map([
   ['/board.js', ['../../web/board.js', 'text/javascript; charset=utf-8']],
   ['/piece-glyph.js', ['../../web/piece-glyph.js', 'text/javascript; charset=utf-8']],
   ['/game-tools.js', ['../../web/game-tools.js', 'text/javascript; charset=utf-8']],
+  ['/move-notation.js', ['../../web/move-notation.js', 'text/javascript; charset=utf-8']],
   ['/game-tools.css', ['../../web/game-tools.css', 'text/css; charset=utf-8']],
   ['/style.css', ['../../web/style.css', 'text/css; charset=utf-8']],
   ['/appearance.css', ['../../web/appearance.css', 'text/css; charset=utf-8']],
   ['/appearance.js', ['../../web/appearance.js', 'text/javascript; charset=utf-8']],
+  ['/appearance-presets.js', ['../../web/appearance-presets.js', 'text/javascript; charset=utf-8']],
+  ['/appearance-colors.js', ['../../web/appearance-colors.js', 'text/javascript; charset=utf-8']],
   ['/fonts/xiangqi-xingkai.woff2', ['../../web/fonts/xiangqi-xingkai.woff2', 'font/woff2']],
   ['/fonts/xiangqi-running.woff2', ['../../web/fonts/xiangqi-running.woff2', 'font/woff2']],
   ['/fonts/xiangqi-kai.woff2', ['../../web/fonts/xiangqi-kai.woff2', 'font/woff2']],
+  ['/fonts/xiangqi-regular.woff2', ['../../web/fonts/xiangqi-regular.woff2', 'font/woff2']],
+  ['/fonts/xiangqi-clerical.ttf', ['../../web/fonts/xiangqi-clerical.ttf', 'font/ttf']],
+  ['/fonts/xiangqi-clerical-square.ttf', ['../../web/fonts/xiangqi-clerical-square.ttf', 'font/ttf']],
+  ['/fonts/clerical-square-metrics.js', ['../../web/fonts/clerical-square-metrics.js', 'text/javascript; charset=utf-8']],
+  ['/fonts/clerical-square-metrics.json', ['../../web/fonts/clerical-square-metrics.json', 'application/json; charset=utf-8']],
+  ['/fonts/clerical-metrics.js', ['../../web/fonts/clerical-metrics.js', 'text/javascript; charset=utf-8']],
+  ['/fonts/clerical-metrics.json', ['../../web/fonts/clerical-metrics.json', 'application/json; charset=utf-8']],
+  ['/fonts/aoyagi-original.zip', ['../../web/fonts/aoyagi-original.zip', 'application/zip']],
+  ['/fonts/LICENSE-aoyagi.txt', ['../../web/fonts/LICENSE-aoyagi.txt', 'text/plain; charset=Shift_JIS']],
+  ['/fonts/moe-clerical-original.zip', ['../../web/fonts/moe-clerical-original.zip', 'application/zip']],
+  ['/fonts/LICENSE-moe-clerical.md', ['../../web/fonts/LICENSE-moe-clerical.md', 'text/plain; charset=utf-8']],
+  ['/fonts/CC-BY-ND-3.0-TW.html', ['../../web/fonts/CC-BY-ND-3.0-TW.html', 'text/html; charset=utf-8']],
   ['/shared/rules.js', ['../shared/rules.js', 'text/javascript; charset=utf-8']],
+  ['/shared/adjudication.js', ['../shared/adjudication.js', 'text/javascript; charset=utf-8']],
   ['/shared/sandbox.js', ['../shared/sandbox.js', 'text/javascript; charset=utf-8']],
   ['/shared/analysis.js', ['../shared/analysis.js', 'text/javascript; charset=utf-8']],
 ]);
+
+// Explicit local texture routes serve the same bundled skins to LAN guests.
+for (const name of [
+  'beech-light', 'walnut-light', 'maple', 'ash', 'golden-oak', 'golden-nanmu', 'teak', 'cherry', 'rosewood',
+  'hainan-huali', 'zitan', 'suan-zhi', 'wenge', 'black-walnut', 'ebony', 'huali', 'camphor',
+  'horn-black', 'horn-ivory', 'jade-white', 'jade-celadon', 'jade-green',
+]) {
+  assets.set(`/textures/${name}.webp`, [`../../web/textures/${name}.webp`, 'image/webp']);
+}
 
 export async function startServer({ port = 3000, host = '0.0.0.0', roomOptions, engineOptions, aiEngine } = {}) {
   const ai = createAiHttp(aiEngine || createPikafish(engineOptions));

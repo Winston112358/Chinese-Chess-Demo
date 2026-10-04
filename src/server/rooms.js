@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { WebSocket } from 'ws';
-import { applyMove, createInitialGame, otherSide, undoMove } from '../shared/rules.js';
-import { parseTimeControl, createClock, startClock, settleClock, clockSnapshot } from './clock.js';
+import { applyMove, createInitialGame, otherSide, undoMove, canUndoResult } from '../shared/rules.js';
+import { parseTimeControl, parseMoveTime, createClock, startClock, settleClock, clockSnapshot } from './clock.js';
 import { parseRoundConfig, START_COUNTDOWN_MS } from './round.js';
 
 export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 1000, countdownMs = START_COUNTDOWN_MS } = {}) {
@@ -24,7 +24,7 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
   function updateClock(room, at) {
     const loser = settleClock(room.clock, at);
     if (!loser || room.game.result) return false;
-    room.game = { ...room.game, result: { winner: otherSide(loser), loser, reason: 'timeout' } };
+    room.game = { ...room.game, result: { winner: otherSide(loser), loser, reason: room.clock.timeoutReason } };
     room.pendingAction = null;
     room.pendingRestart = null;
     room.revision++;
@@ -74,7 +74,7 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
     room.game = createInitialGame();
     room.revision++;
     room.round++;
-    room.clock = createClock(config.timeControl, config.timed);
+    room.clock = createClock(config.timeControl, config.timed, config.moveTimeMs);
     room.phase = 'preparing';
     room.ready = { red: false, black: false };
     room.countdownEndsAt = null;
@@ -103,11 +103,13 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
       const settings = parseTimeControl(message.timeControl);
       if (!settings.ok) return fail(socket, settings.error);
       if (message.timed !== undefined && typeof message.timed !== 'boolean') return fail(socket, '计时设置格式错误');
+      const moveTime = parseMoveTime(message.timed === false ? null : message.moveTimeMs);
+      if (!moveTime.ok) return fail(socket, moveTime.error);
       let code;
       do { code = randomBytes(3).toString('hex').toUpperCase(); } while (rooms.has(code));
       const room = {
         code, game: createInitialGame(), revision: 0, pendingRestart: null, pendingAction: null, updated: Date.now(),
-        clock: createClock(settings.timeControl, message.timed !== false),
+        clock: createClock(settings.timeControl, message.timed !== false, moveTime.moveTimeMs),
         round: 0, phase: 'preparing', ready: { red: false, black: false }, countdownEndsAt: null, countdownTimer: null,
       };
       rooms.set(code, room);
@@ -156,8 +158,8 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
       room.game = result.game;
       room.revision++;
       room.pendingAction = null;
-      room.clock.runningSide = room.game.result || !room.clock.enabled ? null : room.game.turn;
-      room.clock.changedAt = at;
+      if (room.game.result) room.clock.runningSide = null;
+      else startClock(room.clock, room.game.turn, at);
     } else if (message.type === 'action-request') {
       if (!online(room.red) || !online(room.black) || !room.clock.started) return fail(socket, '等待双方连接后再操作');
       if (!['undo', 'draw', 'resign'].includes(message.action)
@@ -169,7 +171,7 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
       if (room.pendingAction || room.pendingRestart) return fail(socket, '已有等待对方回应的请求');
       if (message.action === 'undo') {
         if (!room.game.history.length) return fail(socket, '没有可以悔棋的落子');
-        if (room.game.result && !['checkmate', 'stalemate', 'general-captured'].includes(room.game.result.reason)) {
+        if (!canUndoResult(room.game.result)) {
           return fail(socket, '本局已结束，无法悔棋，请双方同意后重新开局');
         }
       } else if (room.game.result) return fail(socket, '本局已结束，请双方同意后重新开局');
@@ -189,8 +191,8 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
           room.game = { ...room.game, result };
         }
         room.revision++;
-        room.clock.runningSide = room.game.result || !room.clock.enabled ? null : room.game.turn;
-        room.clock.changedAt = at;
+        if (room.game.result) room.clock.runningSide = null;
+        else startClock(room.clock, room.game.turn, at);
       }
       room.pendingAction = null;
     } else if (message.type === 'restart-request') {
@@ -199,7 +201,9 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
       if (room.pendingAction) return fail(socket, '已有等待对方回应的请求');
       if (room.phase === 'countdown') return fail(socket, '请等待开局倒数结束');
       if (message.revision !== undefined && message.revision !== room.revision) return fail(socket, '棋盘已更新，请重新发起请求');
-      const settings = parseRoundConfig(message.config, { redSide: 'red', timed: room.clock.enabled, timeControl: room.clock.initialMs });
+      const settings = parseRoundConfig(message.config, {
+        redSide: 'red', timed: room.clock.enabled, timeControl: room.clock.initialMs, moveTimeMs: room.clock.moveTimeMs,
+      });
       if (!settings.ok) return fail(socket, settings.error);
       room.pendingRestart = { id: randomBytes(12).toString('hex'), action: 'restart', side, revision: room.revision, config: settings.config };
     } else if (message.type === 'restart-answer') {

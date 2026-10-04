@@ -147,7 +147,7 @@ test('refusing a configured restart keeps seats, board and current settings, wit
   const config = { redSide: 'black', timed: false, timeControl: budgets };
   red.send({ type: 'restart-request', revision: 0, config });
   const requested = (await black.wait(state((room) => room.pendingRestart))).room;
-  assert.deepEqual(requested.pendingRestart.config, config);
+  assert.deepEqual(requested.pendingRestart.config, { ...config, moveTimeMs: null });
   assert.equal(requested.clock.remainingMs.red, 5500);
   advance(500);
   black.send({ type: 'restart-answer', requestId: requested.pendingRestart.id, accept: false });

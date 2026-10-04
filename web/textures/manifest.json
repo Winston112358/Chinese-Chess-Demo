@@ -1,0 +1,330 @@
+{
+  "sourceDirectory": "assets/source-png",
+  "format": "webp",
+  "maxDimension": 1024,
+  "quality": 88,
+  "method": 6,
+  "textures": [
+    {
+      "id": "maple",
+      "source": "浅枫木_柔细纤维_轻浅波纹.png",
+      "file": "maple.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "sourceSha256": "8e02214d8fd55ac97aeba482473b78a0db6ed041871d04c0cd94551b32f64d2b",
+      "sha256": "ad222b16e869ed512f01337f775a4d2dc6446f1dda9ddf36c3e70784f2d532b1"
+    },
+    {
+      "id": "ash",
+      "source": "白蜡木_舒展山纹_细长微孔.png",
+      "file": "ash.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "sourceSha256": "d9d46bebc9fdc5b2d6757c99e4689860f5f09d0180a8b09b0ecf957c81832fe7",
+      "sha256": "27fdc10698665cf220f6b2ecea7001a82b5379bd2eeb008f201936f9998ec7b8"
+    },
+    {
+      "id": "golden-oak",
+      "source": "金橡木_层叠山纹_粗细交织.png",
+      "file": "golden-oak.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "sourceSha256": "990019559cecdc318bb23c43c98b56c4594ebbd3238d2d77be6098e8310ef1b0",
+      "sha256": "e091652ce8c6503335a3c6fd4998001c04a67698ae47d3cd648c9bf025ba859a"
+    },
+    {
+      "id": "golden-nanmu",
+      "source": "金丝楠木_金丝流光_水波莹润.png",
+      "file": "golden-nanmu.webp",
+      "size": [
+        920,
+        1024
+      ],
+      "sourceSha256": "fef4012fe231af53c85b4fb2766ed2fae6804c66c329d33558a6add35e7a2659",
+      "sha256": "99d7bcf7c66a27c1252651f6003266ae4c928b71f020d6cdac55aab85f37432a"
+    },
+    {
+      "id": "teak",
+      "source": "柚木_纵向直纹_深浅条带.png",
+      "file": "teak.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "sourceSha256": "a99787779fd4d07e673bc5a8835c056e545c198a723dd4219c686b792f9b43c2",
+      "sha256": "45c6263ce9f6203d0ffda00990056e1be3fada3a1a381886e11239d902e54547"
+    },
+    {
+      "id": "cherry",
+      "source": "樱桃木_柔顺流纹_细密木理.png",
+      "file": "cherry.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "sourceSha256": "9073d0de08a75f4c65f7c9eba429befffa6a67af2e6b509699d903ee113b0f49",
+      "sha256": "f54ee9640a0f3118b8e4f02bbf6fdac9fffa5530cafb30486587efac7bd06263"
+    },
+    {
+      "id": "rosewood",
+      "source": "深玫瑰木_蜿蜒流纹_红褐交织.png",
+      "file": "rosewood.webp",
+      "size": [
+        1024,
+        1024
+      ],
+      "sourceSha256": "ecc1513ffe821169e17a3894ce65c9ac8e749bcf18990755d082d5f2833527ed",
+      "sha256": "97d5c2e54a8fa898223772a43d2dbf3fe13f206779e5be0ce94e107365de5595"
+    },
+    {
+      "id": "hainan-huali",
+      "source": "海南黄花梨.png",
+      "file": "hainan-huali.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "e30dc5efdf41e15d8675625bcda57bbcb27d24efced18c98bad781ef8db37c2b",
+      "sha256": "835bbe49a7c7ab4a47c14a6287ecab56262ded5d9c791056378af248a99a35e4"
+    },
+    {
+      "id": "zitan",
+      "source": "小叶紫檀.png",
+      "file": "zitan.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "0a5358b39e8312c075053bbfcc8de4d61c62a049ecb68d0eb9b709b004122f20",
+      "sha256": "db3bf048082316eb8c6dc221b6af6f2275e978db9dcf329b3793f9b8ec6ceabe"
+    },
+    {
+      "id": "suan-zhi",
+      "source": "大红酸枝.png",
+      "file": "suan-zhi.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "1d44d10f7542161c3c7881759309917ec93dd5c4ba6ec5cc0a0d797038a1b5b0",
+      "sha256": "3964d3f29b37a47f5dc7b12c2d0d5f5f26f78b37fd71fe6d5a3fa037cbe66fa3"
+    },
+    {
+      "id": "wenge",
+      "source": "鸡翅木.png",
+      "file": "wenge.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "e95027f5fc9b85fd67a4e81313b80b0ee288b49b7b5051d21b32262022a56b2f",
+      "sha256": "29bac10b269a7d1609bea95c4154dee2bc98c2cd42328dee05e734e5163d9e5a"
+    },
+    {
+      "id": "black-walnut",
+      "source": "黑胡桃木.png",
+      "file": "black-walnut.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "487831dbf420e41284b2dc23d1bfe287f160172d5232862129650c6d7e1cc14c",
+      "sha256": "de92070df059687aea3b2c2dc3f5273b03609337230ae06c4b259c85d5b82b79"
+    },
+    {
+      "id": "ebony",
+      "source": "黑檀-乌木.png",
+      "file": "ebony.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "adf58528391be4fe2b16f506c328853e953ac247b094aa8afb5dce5c72aee180",
+      "sha256": "59a760c49a8c032c94cd0789bfc0bf98b981397a78820b270b3bbfe860e26df3"
+    },
+    {
+      "id": "huali",
+      "source": "花梨木.png",
+      "file": "huali.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "bca70dd9fb6f4f77b5fe4e8238f9e86552a9811e63c80b021f6cef45758cce76",
+      "sha256": "8506cbbb21e28d1846db35cd38988bd8eeffc8356cea42a8dae90f3264ba6071"
+    },
+    {
+      "id": "camphor",
+      "source": "香樟木.png",
+      "file": "camphor.webp",
+      "size": [
+        922,
+        1024
+      ],
+      "sourceSha256": "87e762c4b23443d075a492f7211a13cc9dbb251455197d0dc323f27d1e500e86",
+      "sha256": "6c26cdd2426f368a0083d39a19012bf2e5d18ef6d58542f11ef2114096c10555"
+    }
+  ],
+  "allImageOrigins": [
+    {
+      "id": "maple",
+      "source": "浅枫木_柔细纤维_轻浅波纹.png",
+      "file": "maple.webp",
+      "sourceSha256": "8e02214d8fd55ac97aeba482473b78a0db6ed041871d04c0cd94551b32f64d2b",
+      "sha256": "ad222b16e869ed512f01337f775a4d2dc6446f1dda9ddf36c3e70784f2d532b1"
+    },
+    {
+      "id": "ash",
+      "source": "白蜡木_舒展山纹_细长微孔.png",
+      "file": "ash.webp",
+      "sourceSha256": "d9d46bebc9fdc5b2d6757c99e4689860f5f09d0180a8b09b0ecf957c81832fe7",
+      "sha256": "27fdc10698665cf220f6b2ecea7001a82b5379bd2eeb008f201936f9998ec7b8"
+    },
+    {
+      "id": "golden-oak",
+      "source": "金橡木_层叠山纹_粗细交织.png",
+      "file": "golden-oak.webp",
+      "sourceSha256": "990019559cecdc318bb23c43c98b56c4594ebbd3238d2d77be6098e8310ef1b0",
+      "sha256": "e091652ce8c6503335a3c6fd4998001c04a67698ae47d3cd648c9bf025ba859a"
+    },
+    {
+      "id": "golden-nanmu",
+      "source": "金丝楠木_金丝流光_水波莹润.png",
+      "file": "golden-nanmu.webp",
+      "sourceSha256": "fef4012fe231af53c85b4fb2766ed2fae6804c66c329d33558a6add35e7a2659",
+      "sha256": "99d7bcf7c66a27c1252651f6003266ae4c928b71f020d6cdac55aab85f37432a"
+    },
+    {
+      "id": "teak",
+      "source": "柚木_纵向直纹_深浅条带.png",
+      "file": "teak.webp",
+      "sourceSha256": "a99787779fd4d07e673bc5a8835c056e545c198a723dd4219c686b792f9b43c2",
+      "sha256": "45c6263ce9f6203d0ffda00990056e1be3fada3a1a381886e11239d902e54547"
+    },
+    {
+      "id": "cherry",
+      "source": "樱桃木_柔顺流纹_细密木理.png",
+      "file": "cherry.webp",
+      "sourceSha256": "9073d0de08a75f4c65f7c9eba429befffa6a67af2e6b509699d903ee113b0f49",
+      "sha256": "f54ee9640a0f3118b8e4f02bbf6fdac9fffa5530cafb30486587efac7bd06263"
+    },
+    {
+      "id": "rosewood",
+      "source": "深玫瑰木_蜿蜒流纹_红褐交织.png",
+      "file": "rosewood.webp",
+      "sourceSha256": "ecc1513ffe821169e17a3894ce65c9ac8e749bcf18990755d082d5f2833527ed",
+      "sha256": "97d5c2e54a8fa898223772a43d2dbf3fe13f206779e5be0ce94e107365de5595"
+    },
+    {
+      "id": "hainan-huali",
+      "source": "海南黄花梨.png",
+      "file": "hainan-huali.webp",
+      "sourceSha256": "e30dc5efdf41e15d8675625bcda57bbcb27d24efced18c98bad781ef8db37c2b",
+      "sha256": "835bbe49a7c7ab4a47c14a6287ecab56262ded5d9c791056378af248a99a35e4"
+    },
+    {
+      "id": "zitan",
+      "source": "小叶紫檀.png",
+      "file": "zitan.webp",
+      "sourceSha256": "0a5358b39e8312c075053bbfcc8de4d61c62a049ecb68d0eb9b709b004122f20",
+      "sha256": "db3bf048082316eb8c6dc221b6af6f2275e978db9dcf329b3793f9b8ec6ceabe"
+    },
+    {
+      "id": "suan-zhi",
+      "source": "大红酸枝.png",
+      "file": "suan-zhi.webp",
+      "sourceSha256": "1d44d10f7542161c3c7881759309917ec93dd5c4ba6ec5cc0a0d797038a1b5b0",
+      "sha256": "3964d3f29b37a47f5dc7b12c2d0d5f5f26f78b37fd71fe6d5a3fa037cbe66fa3"
+    },
+    {
+      "id": "wenge",
+      "source": "鸡翅木.png",
+      "file": "wenge.webp",
+      "sourceSha256": "e95027f5fc9b85fd67a4e81313b80b0ee288b49b7b5051d21b32262022a56b2f",
+      "sha256": "29bac10b269a7d1609bea95c4154dee2bc98c2cd42328dee05e734e5163d9e5a"
+    },
+    {
+      "id": "black-walnut",
+      "source": "黑胡桃木.png",
+      "file": "black-walnut.webp",
+      "sourceSha256": "487831dbf420e41284b2dc23d1bfe287f160172d5232862129650c6d7e1cc14c",
+      "sha256": "de92070df059687aea3b2c2dc3f5273b03609337230ae06c4b259c85d5b82b79"
+    },
+    {
+      "id": "ebony",
+      "source": "黑檀-乌木.png",
+      "file": "ebony.webp",
+      "sourceSha256": "adf58528391be4fe2b16f506c328853e953ac247b094aa8afb5dce5c72aee180",
+      "sha256": "59a760c49a8c032c94cd0789bfc0bf98b981397a78820b270b3bbfe860e26df3"
+    },
+    {
+      "id": "huali",
+      "source": "花梨木.png",
+      "file": "huali.webp",
+      "sourceSha256": "bca70dd9fb6f4f77b5fe4e8238f9e86552a9811e63c80b021f6cef45758cce76",
+      "sha256": "8506cbbb21e28d1846db35cd38988bd8eeffc8356cea42a8dae90f3264ba6071"
+    },
+    {
+      "id": "camphor",
+      "source": "香樟木.png",
+      "file": "camphor.webp",
+      "sourceSha256": "87e762c4b23443d075a492f7211a13cc9dbb251455197d0dc323f27d1e500e86",
+      "sha256": "6c26cdd2426f368a0083d39a19012bf2e5d18ef6d58542f11ef2114096c10555"
+    },
+    {
+      "id": "beech",
+      "source": "浅榉木.png",
+      "file": "beech-light.webp",
+      "sourceSha256": "eed188222a12dfae30cca20f44477c52f8c8911ee70dcc795402d00a72e3c16d",
+      "sha256": "2879449616fbb7f6dc7e64fc2c9e48c8a31c9ffd8c5f83202e3b867a2986d70d"
+    },
+    {
+      "id": "walnut",
+      "source": "浅胡桃木.png",
+      "file": "walnut-light.webp",
+      "sourceSha256": "e4213adb8fcf587634629fa6af2bbe6e7deb57cb7cc146a5be619d977e0be075",
+      "sha256": "923f24b345ab37657f931d289e539b630e197560cd6b5a1878bc316366770f98"
+    },
+    {
+      "id": "horn-black",
+      "source": "黑牛角.png",
+      "file": "horn-black.webp",
+      "sourceSha256": "57f086ccca35332cd91179120c698d49559b43708d905a37d4cc2dc77ee7205c",
+      "sha256": "e9eaca59c70043a985aa3a9395bf933b3bc40246661d66047c08d3e357075933"
+    },
+    {
+      "id": "horn-ivory",
+      "source": "白牛角.png",
+      "file": "horn-ivory.webp",
+      "sourceSha256": "6165c16e7f9f6382841c3110808da8a7e9327b9437808a47fb45003344013338",
+      "sha256": "e901a15be76ebf1b275916cec112d0e4f475ad7d069863797124a60a4e5b600d"
+    },
+    {
+      "id": "jade-white",
+      "source": "白玉.png",
+      "file": "jade-white.webp",
+      "sourceSha256": "61a0918421b618e037c88216877ebfb54b0c9b42610356fba62976741f517aab",
+      "sha256": "d70e6274282f94557ca1e31f1dcc772ff594a249e1c6aaaba46c008f69051e37"
+    },
+    {
+      "id": "jade-celadon",
+      "source": "青玉.png",
+      "file": "jade-celadon.webp",
+      "sourceSha256": "37b3d1ae4f084d8c7d572c6bfb3be07cda8e4dac0d27e7c119c1e4bea496d2e1",
+      "sha256": "81e05bf4fc15b4ca74c6c79d7d5f0492b2c517eca434af496d14ff6858cf5895"
+    },
+    {
+      "id": "jade-green",
+      "source": "碧玉.png",
+      "file": "jade-green.webp",
+      "sourceSha256": "27c8999a7ec885c719853690e214bff677a6a120abb929392dcecfa531ea0e30",
+      "sha256": "cacc19f6f4638ad2b9baee75996bc2dcb5701e4b8d5bfad5b99568ce1a811846"
+    }
+  ]
+}

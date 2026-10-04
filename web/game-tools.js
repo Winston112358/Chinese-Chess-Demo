@@ -37,7 +37,7 @@ function renderCaptureRow(element, side, captures, boardStyle, skin) {
     token.setAttribute('role', 'listitem');
     token.setAttribute('aria-label', `${SIDE_NAMES[piece.side]}${name}，第${ply}步被吃`);
     token.title = `${SIDE_NAMES[piece.side]}${name}，第${ply}步被吃`;
-    token.append(pieceGlyph(name));
+    token.append(pieceGlyph(name, piece.side));
     pieces.append(token);
   }
   element.replaceChildren(label, pieces);

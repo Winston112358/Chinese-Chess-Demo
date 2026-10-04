@@ -351,3 +351,55 @@ test('agreed undo can reopen a real checkmate without restoring either time budg
   assert.equal(next.game.result.reason, 'checkmate');
   assert.equal(next.clock.remainingMs.red, ended.clock.remainingMs.red - 200);
 });
+
+test('repetition is broadcast to both seats, survives resume, and agreed undo or restart restores play', async (t) => {
+  const { server, red, redSeat, connectBlack, advance } = await setup(t, { red: 600_000, black: 900_000 });
+  let { black, blackSeat } = await connectBlack();
+  const cycle = [[1, 9, 2, 7], [1, 0, 2, 2], [2, 7, 1, 9], [2, 2, 1, 0]];
+  let ended;
+  for (let revision = 0; revision < 8; revision++) {
+    advance(100);
+    ended = await move(red, black, revision % 2 ? black : red, revision, cycle[revision % 4]);
+    if (revision < 7) assert.equal(ended.game.result, null);
+  }
+  assert.deepEqual(ended.game.result, { winner: null, loser: null, reason: 'repetition' });
+  assert.equal(ended.game.history.length, 8);
+  assert.equal(ended.clock.runningSide, null);
+  assert.deepEqual(ended.clock.remainingMs, { red: 599_600, black: 899_600 });
+  advance(100_000);
+  for (const player of [red, black]) {
+    player.send({ type: 'move', revision: 8, from: { x: 1, y: 9 }, to: { x: 2, y: 7 } });
+    assert.match((await player.wait(error)).error, /结束/);
+  }
+  black.socket.close();
+  await red.wait(state(8, (room) => !room.players.black));
+  black = await client(server.port);
+  black.send({ type: 'resume', code: redSeat.code, token: blackSeat.token });
+  await black.wait((message) => message.type === 'seat');
+  const resumed = await broadcast(red, black, 8, (room) => room.players.black);
+  assert.deepEqual(resumed.game, ended.game);
+  assert.deepEqual(resumed.clock.remainingMs, ended.clock.remainingMs);
+  assert.equal(resumed.clock.runningSide, null);
+  const pending = (await request(red, black, black, 'undo', 8)).pendingAction;
+  const reopened = await answer(red, black, red, pending, true, 9);
+  assert.equal(reopened.game.result, null);
+  assert.equal(reopened.game.history.length, 7);
+  assert.equal(reopened.game.turn, 'black');
+  assert.equal(reopened.clock.runningSide, 'black');
+  assert.deepEqual(reopened.clock.remainingMs, ended.clock.remainingMs);
+  advance(200);
+  const changed = await move(red, black, black, 9, [2, 2, 4, 1]);
+  assert.equal(changed.game.result, null);
+  assert.equal(changed.clock.remainingMs.black, ended.clock.remainingMs.black - 200);
+  red.send({ type: 'restart-request', revision: 10 });
+  const restart = await broadcast(red, black, 10, (room) => Boolean(room.pendingRestart));
+  black.send({ type: 'restart-answer', requestId: restart.pendingRestart.id, accept: true });
+  const fresh = await broadcast(red, black, 11, (room) => room.round === 1);
+  assert.deepEqual(fresh.game, createInitialGame());
+  assert.equal(fresh.phase, 'preparing');
+  assert.equal(fresh.clock.started, false);
+  await prepare(red, black);
+  const first = await move(red, black, red, 11, cycle[0]);
+  assert.equal(first.game.result, null);
+  assert.equal(first.game.history.length, 1);
+});

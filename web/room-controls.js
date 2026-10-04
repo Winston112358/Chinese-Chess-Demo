@@ -6,7 +6,8 @@ export function restartDescription(config, side) {
   if (!config) return '同意后重置棋局，双方重新准备。';
   const first = config.redSide === side ? '你执红先行，对方执黑' : '对方执红先行，你执黑';
   const minutes = (ms) => Number((ms / 60_000).toFixed(2));
-  const time = config.timed ? `红方 ${minutes(config.timeControl.red)} 分钟，黑方 ${minutes(config.timeControl.black)} 分钟` : '不计时';
+  const moveTime = config.moveTimeMs == null ? '单步不限时' : `每步 ${config.moveTimeMs / 1000} 秒`;
+  const time = config.timed ? `红方 ${minutes(config.timeControl.red)} 分钟，黑方 ${minutes(config.timeControl.black)} 分钟；${moveTime}` : '不计时';
   return `下一局：${first}；${time}。同意后进入准备阶段，双方准备后倒数 3 秒开局。`;
 }
 
@@ -26,6 +27,19 @@ export function readTimes(document, prefix = '') {
   return times;
 }
 
+export function readMoveTime(document, prefix = '', timed = true) {
+  if (!timed || !document.getElementById(`${prefix}move-timed-toggle`).checked) return null;
+  const choice = document.getElementById(`${prefix}move-time-choice`).value;
+  const input = document.getElementById(`${prefix}move-time-custom`);
+  const value = choice === 'custom' ? input.value.trim() : choice;
+  const seconds = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(seconds) || seconds < 1 || seconds > 3600) {
+    input.focus();
+    throw new Error('单步限时请输入 1–3600 秒的整数');
+  }
+  return seconds * 1000;
+}
+
 export function createRoomControls({ document, getState, onReady, onRestart, notify, now }) {
   const $ = (id) => document.getElementById(id);
   const dialog = $('restart-config');
@@ -38,9 +52,8 @@ export function createRoomControls({ document, getState, onReady, onRestart, not
     for (const color of colors) {
       const select = $(`${prefix}${color}-time-choice`);
       select.addEventListener('change', () => {
-        const custom = select.value === 'custom';
-        $(`${prefix}${color}-custom-label`).hidden = !custom;
-        if (custom) $(`${prefix}${color}-time-custom`).focus();
+        timing(prefix, $(prefix ? 'restart-timed' : 'timed-toggle'));
+        if (select.value === 'custom' && !select.disabled) $(`${prefix}${color}-time-custom`).focus();
       });
     }
   }
@@ -48,9 +61,32 @@ export function createRoomControls({ document, getState, onReady, onRestart, not
   timeInputs('restart-');
   function timing(prefix, checkbox) {
     $(`${prefix}time-options`).hidden = !checkbox.checked;
+    for (const color of colors) {
+      const select = $(`${prefix}${color}-time-choice`);
+      const custom = select.value === 'custom';
+      select.disabled = !checkbox.checked;
+      $(`${prefix}${color}-custom-label`).hidden = !custom;
+      $(`${prefix}${color}-time-custom`).disabled = !checkbox.checked || !custom;
+    }
+    const enabled = checkbox.checked && $(`${prefix}move-timed-toggle`).checked;
+    $(`${prefix}move-timed-toggle`).disabled = !checkbox.checked;
+    $(`${prefix}move-time-options`).hidden = !enabled;
+    const choice = $(`${prefix}move-time-choice`);
+    choice.disabled = !enabled;
+    $(`${prefix}move-custom-label`).hidden = choice.value !== 'custom';
+    $(`${prefix}move-time-custom`).disabled = !enabled || choice.value !== 'custom';
   }
   $('timed-toggle').addEventListener('change', () => timing('', $('timed-toggle')));
   $('restart-timed').addEventListener('change', () => timing('restart-', $('restart-timed')));
+  for (const prefix of ['', 'restart-']) {
+    const checkbox = $(prefix ? 'restart-timed' : 'timed-toggle');
+    $(`${prefix}move-timed-toggle`).addEventListener('change', () => timing(prefix, checkbox));
+    $(`${prefix}move-time-choice`).addEventListener('change', () => {
+      timing(prefix, checkbox);
+      if (!$(`${prefix}move-time-custom`).disabled) $(`${prefix}move-time-custom`).focus();
+    });
+    timing(prefix, checkbox);
+  }
   $('ready-button').addEventListener('click', () => {
     const { room, side, connected, busy } = getState();
     if (!room || room.phase !== 'preparing' || !connected || busy || room.pendingRestart) return;
@@ -61,12 +97,15 @@ export function createRoomControls({ document, getState, onReady, onRestart, not
     event.preventDefault();
     const { room, connected, busy } = getState();
     if (!room || `${room.code}:${room.round}` !== editorRound || !connected || busy || room.phase === 'countdown') return;
-    let timeControl;
+    let timeControl, moveTimeMs;
     const timed = $('restart-timed').checked;
-    try { timeControl = timed ? readTimes(document, 'restart-') : { ...room.clock.initialMs }; }
+    try {
+      timeControl = timed ? readTimes(document, 'restart-') : { ...room.clock.initialMs };
+      moveTimeMs = readMoveTime(document, 'restart-', timed);
+    }
     catch (error) { $('restart-config-error').textContent = error.message; return; }
     const message = { type: 'restart-request', revision: room.revision,
-      config: { redSide: $('restart-red-side').value, timed, timeControl } };
+      config: { redSide: $('restart-red-side').value, timed, timeControl, moveTimeMs } };
     close();
     onRestart(message);
   });
@@ -78,7 +117,6 @@ export function createRoomControls({ document, getState, onReady, onRestart, not
     $('restart-other-red').value = side === 'red' ? 'black' : 'red';
     $('restart-red-side').value = 'red';
     $('restart-timed').checked = room.clock.enabled !== false;
-    timing('restart-', $('restart-timed'));
     for (const color of colors) {
       const minutes = String(Number((room.clock.initialMs[color] / 60_000).toFixed(2)));
       const preset = ['10', '15'].includes(minutes);
@@ -86,6 +124,11 @@ export function createRoomControls({ document, getState, onReady, onRestart, not
       $(`restart-${color}-time-custom`).value = minutes;
       $(`restart-${color}-custom-label`).hidden = preset;
     }
+    const seconds = room.clock.moveTimeMs == null ? 60 : room.clock.moveTimeMs / 1000;
+    $('restart-move-timed-toggle').checked = $('restart-timed').checked && room.clock.moveTimeMs != null;
+    $('restart-move-time-choice').value = [60, 90].includes(seconds) ? String(seconds) : 'custom';
+    $('restart-move-time-custom').value = String(seconds);
+    timing('restart-', $('restart-timed'));
     $('restart-config-error').textContent = '';
     dialog.showModal();
     $('restart-red-side').focus();

@@ -62,7 +62,7 @@ test('HTTP serves only app assets and reports LAN addresses', async (t) => {
   const server = await startServer({ port: 0, host: '127.0.0.1' });
   t.after(() => server.close());
   const base = `http://127.0.0.1:${server.port}`;
-  for (const path of ['/', '/style.css', '/appearance.css', '/game-tools.css', '/app.js', '/appearance.js', '/board.js', '/piece-glyph.js', '/game-tools.js', '/shared/rules.js', '/shared/sandbox.js', '/shared/analysis.js']) {
+  for (const path of ['/', '/style.css', '/appearance.css', '/game-tools.css', '/app.js', '/appearance.js', '/board.js', '/piece-glyph.js', '/game-tools.js', '/shared/rules.js', '/shared/adjudication.js', '/shared/sandbox.js', '/shared/analysis.js']) {
     const response = await fetch(base + path);
     assert.equal(response.status, 200);
     assert.ok((await response.text()).length > 20);

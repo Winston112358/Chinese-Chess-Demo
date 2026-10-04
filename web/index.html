@@ -16,41 +16,39 @@
   <main>
     <header class="game-header">
       <div class="game-title">
-        <h1>中国象棋 <small>试玩版 v0.4.3</small></h1>
+        <h1>中国象棋 <small>试玩版 v0.5.7</small></h1>
         <p>同机双人 · 皮卡鱼人机对战 · 局域网对弈</p>
       </div>
       <div id="clock-panel" class="clock-panel" aria-label="双方剩余时间" hidden>
         <div id="clock-red" class="clock red">
           <span>红方剩余</span>
           <time id="time-red">10:00</time>
+          <span id="move-clock-red" class="move-clock-row"><span>本步</span><time id="move-time-red">未启用</time></span>
         </div>
         <div id="clock-black" class="clock black">
           <span>黑方剩余</span>
           <time id="time-black">10:00</time>
+          <span id="move-clock-black" class="move-clock-row"><span>本步</span><time id="move-time-black">未启用</time></span>
         </div>
       </div>
     </header>
-    <div class="toolbar">
-      <strong id="mode">同机双人</strong>
-      <button id="restart">重新开局</button>
-      <button id="undo">悔棋一步</button>
-      <button id="draw" disabled>求和</button>
-      <button id="resign" disabled>认输</button>
-      <button id="flip">翻转棋盘</button>
-      <button id="local" hidden>返回同机双人</button>
+    <div class="game-actions">
+      <div class="toolbar">
+        <strong id="mode">同机双人</strong>
+        <button id="restart">重新开局</button>
+        <button id="undo">悔棋一步</button>
+        <button id="draw" disabled>求和</button>
+        <button id="resign" disabled>认输</button>
+        <button id="flip">翻转棋盘</button>
+        <button id="local" hidden>返回同机双人</button>
+      </div>
+      <p id="turn" class="turn" aria-live="polite"></p>
     </div>
-    <p id="turn" class="turn" aria-live="polite"></p>
     <p id="message" class="message" role="status"></p>
-    <section id="ready-panel" class="ready-panel" aria-label="对局准备" hidden>
-      <div class="ready-statuses"><span id="own-ready-status"></span><span id="opponent-ready-status"></span></div>
-      <button id="ready-button" type="button">准备好了</button>
-    </section>
-    <button id="result-summary" class="result-summary" type="button" hidden></button>
     <div class="game-layout">
       <section class="game-area" aria-label="象棋对局">
         <div class="board-tools">
           <div class="sandbox-controls toolbar">
-            <button id="ai-assist" type="button" disabled>AI 帮我走一步</button>
             <button id="sandbox-toggle" aria-pressed="false">进入沙盘</button>
             <button id="sandbox-undo" hidden>沙盘撤销一步</button>
           </div>
@@ -59,13 +57,24 @@
             <label><input id="captures-toggle" type="checkbox">双方已吃子</label>
           </div>
         </div>
-        <p id="sandbox-banner" class="sandbox-banner" role="status" hidden></p>
-        <p id="danger-legend" class="hint" hidden>蓝紫虚线圈：对手下一步可合法吃到的己方棋子，仅提示当前局面。</p>
-        <div id="captures-top" class="capture-row" hidden></div>
-        <div id="board" class="board" data-font="running" data-skin="ivory" role="group" aria-label="象棋棋盘"></div>
-        <div id="captures-bottom" class="capture-row" hidden></div>
+        <div class="board-slot">
+          <div id="board" class="board" data-font="running" data-skin="ivory" role="group" aria-label="象棋棋盘"></div>
+        </div>
       </section>
       <aside>
+        <section class="panel round-state-panel" aria-label="联机与推演状态">
+          <section id="ready-panel" class="ready-panel" aria-label="对局准备" hidden>
+            <div class="ready-statuses"><span id="own-ready-status"></span><span id="opponent-ready-status"></span></div>
+            <button id="ready-button" type="button">准备好了</button>
+          </section>
+          <button id="result-summary" class="result-summary" type="button" hidden></button>
+          <p id="sandbox-banner" class="sandbox-banner" role="status" hidden></p>
+        </section>
+        <section class="panel board-info-panel" aria-label="棋盘提示与吃子">
+          <p id="danger-legend" class="hint" hidden>蓝紫虚线圈：对手下一步可合法吃到的己方棋子，仅提示当前局面。</p>
+          <div id="captures-top" class="capture-row" hidden></div>
+          <div id="captures-bottom" class="capture-row" hidden></div>
+        </section>
         <section class="panel ai-panel" aria-labelledby="ai-heading">
           <h2 id="ai-heading">人机对战 · 皮卡鱼</h2>
           <label for="ai-side">选择你的执子</label>
@@ -92,7 +101,7 @@
           <div class="room-controls">
             <fieldset id="time-settings" class="time-settings">
               <legend>房主建房前设置每方总时间</legend>
-              <label class="timed-choice"><input id="timed-toggle" type="checkbox" checked>启用计时</label>
+              <label class="timed-choice"><input id="timed-toggle" type="checkbox" checked>启用计时（双方总时间）</label>
               <div id="time-options" class="time-options">
                 <div>
                   <label for="red-time-choice">红方</label>
@@ -116,8 +125,18 @@
                     <input id="black-time-custom" type="number" min="0.1" max="180" step="0.01" value="10" inputmode="decimal">
                   </label>
                 </div>
+                <div class="move-limit-settings">
+                  <label class="timed-choice"><input id="move-timed-toggle" type="checkbox">启用单步限时</label>
+                  <div id="move-time-options" class="move-time-options" hidden>
+                    <label for="move-time-choice">每步时间</label>
+                    <select id="move-time-choice" disabled><option value="60">60 秒</option><option value="90">90 秒</option><option value="custom">自定义秒数</option></select>
+                    <label id="move-custom-label" class="custom-time" for="move-time-custom" hidden>每步秒数
+                      <input id="move-time-custom" type="number" min="1" max="3600" step="1" value="60" inputmode="numeric" disabled>
+                    </label>
+                  </div>
+                </div>
               </div>
-              <p class="hint">自定义 0.1–180 分钟，最多两位小数。双方准备并倒数结束后开钟。</p>
+              <p class="hint">总时可自定义 0.1–180 分钟，最多两位小数；单步可设 1–3600 秒整数。双方准备并倒数结束后开钟。</p>
             </fieldset>
             <button id="create">创建房间（红方）</button>
             <input id="room-code" aria-label="房间码" placeholder="6 位房间码" maxlength="6" autocomplete="off">
@@ -145,23 +164,66 @@
             <option value="running">行书 · 龙藏衍生</option>
             <option value="kai">楷体 · 文楷衍生</option>
             <option value="cursive">草书 · 志莽行书衍生</option>
+            <option value="regular">正楷 · 马善政衍生</option>
+            <option value="clerical">隶书 · 青柳隶书</option>
+            <option value="clerical-square">隶书 · 教育部（方整）</option>
           </select>
-          <p id="font-note" class="appearance-note">字库随软件提供，缺字逐字回退到自带楷体。</p>
+          <p id="font-note" class="appearance-note">字库随软件提供，缺字逐字回退到自带楷体。两种隶书采用传统棋具字样：红俥、傌，黑車、馬。“傌”使用内置楷体；教育部隶书另有“俥”“砲”回退到内置楷体。</p>
+          <details id="board-skin-picker" class="appearance-picker">
+            <summary id="board-skin-summary" class="appearance-picker-summary"><span>棋盘材质</span><span id="board-skin-current" class="appearance-current">米白</span></summary>
           <fieldset class="skin-options">
-            <legend>棋局皮肤</legend>
+            <legend>棋盘材质</legend>
             <div class="skin-group">
-              <h3>纯色配对</h3>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="ivory" checked><span class="skin-swatch" data-skin="ivory" aria-hidden="true"></span><span class="skin-name">米白 · 朱砂</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="celadon"><span class="skin-swatch" data-skin="celadon" aria-hidden="true"></span><span class="skin-name">青瓷 · 墨色</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="mist"><span class="skin-swatch" data-skin="mist" aria-hidden="true"></span><span class="skin-name">雾蓝 · 藏青</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="lotus"><span class="skin-swatch" data-skin="lotus" aria-hidden="true"></span><span class="skin-name">浅藕 · 紫檀</span></label>
+              <h3>纯色</h3>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="ivory" checked><span class="skin-swatch" data-skin="ivory" aria-hidden="true"></span><span class="skin-name">米白</span><span class="skin-detail">温润米色</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="celadon"><span class="skin-swatch" data-skin="celadon" aria-hidden="true"></span><span class="skin-name">青瓷</span><span class="skin-detail">浅绿底色</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="mist"><span class="skin-swatch" data-skin="mist" aria-hidden="true"></span><span class="skin-name">雾蓝</span><span class="skin-detail">清浅蓝灰</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="lotus"><span class="skin-swatch" data-skin="lotus" aria-hidden="true"></span><span class="skin-name">浅藕</span><span class="skin-detail">柔和藕粉</span></label>
             </div>
             <div class="skin-group">
-              <h3>浅木纹</h3>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="beech"><span class="skin-swatch" data-skin="beech" aria-hidden="true"></span><span class="skin-name">浅榉木</span></label>
-              <label class="skin-choice"><input type="radio" name="board-skin" value="walnut"><span class="skin-swatch" data-skin="walnut" aria-hidden="true"></span><span class="skin-name">浅胡桃木</span></label>
+              <h3>木纹</h3>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="beech"><span class="skin-swatch" data-skin="beech" aria-hidden="true"></span><span class="skin-name">浅榉木</span><span class="skin-detail">细直纤维 · 自然微孔</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="walnut"><span class="skin-swatch" data-skin="walnut" aria-hidden="true"></span><span class="skin-name">浅胡桃木</span><span class="skin-detail">舒展山纹 · 波状木理</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="maple"><span class="skin-swatch" data-skin="maple" aria-hidden="true"></span><span class="skin-name">浅枫木</span><span class="skin-detail">柔细纤维 · 轻浅波纹</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="ash"><span class="skin-swatch" data-skin="ash" aria-hidden="true"></span><span class="skin-name">白蜡木</span><span class="skin-detail">舒展山纹 · 细长微孔</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="golden-oak"><span class="skin-swatch" data-skin="golden-oak" aria-hidden="true"></span><span class="skin-name">金橡木</span><span class="skin-detail">层叠山纹 · 粗细交织</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="golden-nanmu"><span class="skin-swatch" data-skin="golden-nanmu" aria-hidden="true"></span><span class="skin-name">金丝楠木</span><span class="skin-detail">金丝流光 · 水波莹润</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="teak"><span class="skin-swatch" data-skin="teak" aria-hidden="true"></span><span class="skin-name">柚木</span><span class="skin-detail">纵向直纹 · 深浅条带</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="cherry"><span class="skin-swatch" data-skin="cherry" aria-hidden="true"></span><span class="skin-name">樱桃木</span><span class="skin-detail">柔顺流纹 · 细密木理</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="rosewood"><span class="skin-swatch" data-skin="rosewood" aria-hidden="true"></span><span class="skin-name">深玫瑰木</span><span class="skin-detail">蜿蜒流纹 · 红褐交织</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="hainan-huali"><span class="skin-swatch" data-skin="hainan-huali" aria-hidden="true"></span><span class="skin-name">海南黄花梨</span><span class="skin-detail">卷曲鬼脸纹 · 暖金褐色</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="zitan"><span class="skin-swatch" data-skin="zitan" aria-hidden="true"></span><span class="skin-name">小叶紫檀</span><span class="skin-detail">细密横纹 · 深紫红色</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="suan-zhi"><span class="skin-swatch" data-skin="suan-zhi" aria-hidden="true"></span><span class="skin-name">大红酸枝</span><span class="skin-detail">交错流纹 · 红褐木理</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="wenge"><span class="skin-swatch" data-skin="wenge" aria-hidden="true"></span><span class="skin-name">鸡翅木</span><span class="skin-detail">羽状条纹 · 深浅交织</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="black-walnut"><span class="skin-swatch" data-skin="black-walnut" aria-hidden="true"></span><span class="skin-name">黑胡桃木</span><span class="skin-detail">自然木纹</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="ebony"><span class="skin-swatch" data-skin="ebony" aria-hidden="true"></span><span class="skin-name">黑檀·乌木</span><span class="skin-detail">自然木理</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="huali"><span class="skin-swatch" data-skin="huali" aria-hidden="true"></span><span class="skin-name">花梨木</span><span class="skin-detail">自然木纹</span></label>
+              <label class="skin-choice"><input type="radio" name="board-skin" value="camphor"><span class="skin-swatch" data-skin="camphor" aria-hidden="true"></span><span class="skin-name">香樟木</span><span class="skin-detail">自然木理</span></label>
             </div>
           </fieldset>
+          </details>
+          <details id="piece-skin-picker" class="appearance-picker">
+            <summary id="piece-skin-summary" class="appearance-picker-summary"><span>棋子材质</span><span id="piece-skin-current" class="appearance-current">象牙</span></summary>
+          <fieldset class="skin-options">
+            <legend>棋子材质</legend>
+            <div class="skin-group">
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="ivory" checked><span class="piece-swatch" data-piece-skin="ivory" aria-hidden="true"></span><span class="skin-name">象牙</span><span class="skin-detail">温润象牙色</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="maple"><span class="piece-swatch" data-piece-skin="maple" aria-hidden="true"></span><span class="skin-name">浅枫木</span><span class="skin-detail">轻浅细纹</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="beech"><span class="piece-swatch" data-piece-skin="beech" aria-hidden="true"></span><span class="skin-name">浅榉木</span><span class="skin-detail">细直木理</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="oak"><span class="piece-swatch" data-piece-skin="oak" aria-hidden="true"></span><span class="skin-name">金橡木</span><span class="skin-detail">暖金山纹</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="cherry"><span class="piece-swatch" data-piece-skin="cherry" aria-hidden="true"></span><span class="skin-name">樱桃木</span><span class="skin-detail">柔顺暖木</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="walnut"><span class="piece-swatch" data-piece-skin="walnut" aria-hidden="true"></span><span class="skin-name">胡桃木</span><span class="skin-detail">淡褐弧纹</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="rosewood"><span class="piece-swatch" data-piece-skin="rosewood" aria-hidden="true"></span><span class="skin-name">玫瑰木</span><span class="skin-detail">红褐流纹</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="horn-black"><span class="piece-swatch" data-piece-skin="horn-black" aria-hidden="true"></span><span class="skin-name">黑牛角</span><span class="skin-detail">黑褐层纹 · 密实丝理</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="horn-ivory"><span class="piece-swatch" data-piece-skin="horn-ivory" aria-hidden="true"></span><span class="skin-name">白牛角</span><span class="skin-detail">暖乳白色 · 层状缕纹</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="jade-white"><span class="piece-swatch" data-piece-skin="jade-white" aria-hidden="true"></span><span class="skin-name">白玉</span><span class="skin-detail">乳白云雾 · 细柔玉理</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="jade-celadon"><span class="piece-swatch" data-piece-skin="jade-celadon" aria-hidden="true"></span><span class="skin-name">青玉</span><span class="skin-detail">浅青云纹 · 温润玉色</span></label>
+              <label class="skin-choice"><input type="radio" name="piece-skin" value="jade-green"><span class="piece-swatch" data-piece-skin="jade-green" aria-hidden="true"></span><span class="skin-name">碧玉</span><span class="skin-detail">青绿云斑 · 润泽玉理</span></label>
+            </div>
+          </fieldset>
+          </details>
+          <p class="appearance-note">棋盘和棋子可分别搭配，更换棋盘不会改变棋子材质。</p>
+          <p class="appearance-note">相近色搭配会微调棋子表面明暗，保持棋子清晰。</p>
           <p class="appearance-note">房主和参与者可各自选择。此设备会记住你的外观偏好。</p>
           <p id="appearance-status" class="appearance-status" role="status" aria-live="polite"></p>
         </section>
@@ -173,10 +235,18 @@
         <section class="panel">
           <h2>对局说明</h2>
           <p>已限制棋子的走法、吃子、将帅照面和自陷将军，并提示将军。</p>
-          <p>自动裁定将死、困毙、将帅被吃和联机超时。联机双方准备后倒数开局；重开可协商执子、是否计时及双方时间。</p>
+          <p>自动裁定将死、困毙、将帅被吃、长将和长捉违例、重复局面、无吃子自然限着、双方无进攻子力及联机超时。联机双方准备后倒数开局；重开可协商执子、是否计时及双方时间。</p>
           <p>沙盘仅在本机推演，真实对局不停钟；真实棋盘更新后同步沙盘基线。联机悔棋、求和和认输须对手投票同意。</p>
-          <p>双人对局中可点击“AI 帮我走一步”，让皮卡鱼分析当前局面并直接落子，每次只走一步。联机仅限自己的回合，分析期间照常计时；可取消分析或自行落子。</p>
-          <p>人机模式接入皮卡鱼，可选先后手，认输立即生效。暂不提供自动和棋或长将长捉裁定。同机双人与人机对战不计时。</p>
+          <p>双人对局中，“AI 帮我构思一步”只给出中文着法建议，“AI 帮我走一步”则直接落子，每次只走一步。构思时仍可点击走一步；建议完成后，局面不变就执行该建议。联机仅限自己的回合，分析期间照常计时；可取消分析或自行落子。</p>
+          <p>循环裁决采用皮卡鱼程序竞赛规则：同一局面第三次出现时，单方长将或违规长捉判负，双方同责或许可循环判和。人机模式接入皮卡鱼，可选先后手，认输立即生效。同机双人与人机对战不计时。</p>
+        </section>
+        <section class="panel ai-assist-panel" aria-label="AI 辅助">
+          <div class="ai-assist-actions">
+            <button id="ai-assist" type="button" disabled>AI 帮我走一步</button>
+            <button id="ai-suggest" type="button" disabled>AI 帮我构思一步</button>
+          </div>
+          <p id="ai-assist-message" role="status" aria-live="polite"></p>
+          <p class="ai-notation-note">记谱：红方用汉字数字，黑方用阿拉伯数字。马步末尾的数字表示落点列号。</p>
         </section>
       </aside>
     </div>
@@ -192,7 +262,7 @@
         <option id="restart-own-red" value="red">我方执红</option>
         <option id="restart-other-red" value="black">对方执红</option>
       </select>
-      <label class="timed-choice"><input id="restart-timed" type="checkbox" checked>启用计时</label>
+      <label class="timed-choice"><input id="restart-timed" type="checkbox" checked>启用计时（双方总时间）</label>
       <div id="restart-time-options" class="time-options">
         <div>
           <label for="restart-red-time-choice">红方总时间</label>
@@ -207,6 +277,16 @@
           <label id="restart-black-custom-label" for="restart-black-time-custom" hidden>黑方分钟数
             <input id="restart-black-time-custom" type="number" min="0.1" max="180" step="0.01" value="10" inputmode="decimal">
           </label>
+        </div>
+        <div class="move-limit-settings">
+          <label class="timed-choice"><input id="restart-move-timed-toggle" type="checkbox">启用单步限时</label>
+          <div id="restart-move-time-options" class="move-time-options" hidden>
+            <label for="restart-move-time-choice">每步时间</label>
+            <select id="restart-move-time-choice" disabled><option value="60">60 秒</option><option value="90">90 秒</option><option value="custom">自定义秒数</option></select>
+            <label id="restart-move-custom-label" for="restart-move-time-custom" hidden>每步秒数
+              <input id="restart-move-time-custom" type="number" min="1" max="3600" step="1" value="60" inputmode="numeric" disabled>
+            </label>
+          </div>
         </div>
       </div>
       <p id="restart-config-error" class="error" role="status"></p>
