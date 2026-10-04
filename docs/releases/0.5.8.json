@@ -1,0 +1,38 @@
+{
+  "version": "0.5.8",
+  "date": "2026-10-04",
+  "platform": "Windows x64",
+  "type": "portable",
+  "path": "dist/Chinese-Chess-Demo-0.5.8-x64.exe",
+  "bytes": 167569851,
+  "sha256": "e0879fc937739268a433499fa61ab0e41059b48e87356396d0842a2e7f247605",
+  "featureCommits": ["a8fc6bd", "897ebae"],
+  "changes": [
+    "Automatic repetition, perpetual-check/chase, effective no-capture move limit, and defensive-material adjudication",
+    "Canonical move notation alongside coordinates and captures",
+    "Finished-game replay with configurable autoplay, pause, step controls, and final surviving history",
+    "Independent sandbox at any replay position",
+    "Reserved endgame-mode entry"
+  ],
+  "verification": {
+    "testsPassed": 432,
+    "sourceFilesMatched": 75,
+    "packagedHttpAssetsChecked": 57,
+    "fonts": 6,
+    "textures": 22,
+    "engineModelLicensesAndSourceVerified": true,
+    "nativePortableLaunch": true,
+    "duplicateLaunchPreservesPrimaryEngineAndModel": true,
+    "nativeAiLegalMove": true,
+    "twoLocalWebSocketClientsEndInSameRepetitionDraw": true,
+    "replayPlaybackAndSandboxUi": true,
+    "reports": [
+      "artifacts/replay-v058/test-results.txt",
+      "artifacts/replay-v058/package-verification.json",
+      "artifacts/replay-v058/native-http-verification.json",
+      "artifacts/replay-v058/duplicate-verification.json"
+    ],
+    "screenshot": "artifacts/replay-v058/packed-replay.png"
+  },
+  "previousPortablePreserved": "dist/ai-lan-v057/Chinese-Chess-Demo-0.5.7-x64.exe"
+}
