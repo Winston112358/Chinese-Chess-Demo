@@ -8,3 +8,5 @@ vendor/pikafish/Copying.txt -text
 vendor/pikafish/NNUE-License.md -text
 vendor/pikafish/AUTHORS -text
 vendor/pikafish/UPSTREAM-README.md -text
+web/fonts/LICENSE-aoyagi.txt -text
+web/fonts/CC-BY-ND-3.0-TW.html -text

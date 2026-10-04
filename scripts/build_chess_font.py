@@ -337,8 +337,9 @@ def build_clerical_original(source, font, key="clerical"):
     output.write_bytes(source)
     metrics = clerical_metrics(font, key)
     serialized = json.dumps(metrics, ensure_ascii=False, indent=2)
-    (FONT_DIR / spec["render_metrics"]).write_text(serialized + "\n", encoding="utf-8")
-    (FONT_DIR / spec["render_metrics"]).with_suffix(".js").write_text(metrics_module(metrics, key), encoding="utf-8")
+    # Hash the same UTF-8/LF bytes on Windows and Linux, including after checkout.
+    (FONT_DIR / spec["render_metrics"]).write_bytes((serialized + "\n").encode("utf-8"))
+    (FONT_DIR / spec["render_metrics"]).with_suffix(".js").write_bytes(metrics_module(metrics, key).encode("utf-8"))
     print(f"Copied original {output.name} ({len(source)} bytes); generated SVG metrics for {len(metrics['glyphs'])} native traditional glyphs")
 
 
@@ -377,8 +378,8 @@ def write_manifest():
         "builder_dependencies": {"fonttools": "4.62.1", "brotli": "1.0.9"},
         "fonts": [font_record(key) for key in SPECS],
     }
-    (FONT_DIR / "manifest.json").write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    (FONT_DIR / "manifest.json").write_bytes(
+        (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     )
 
 

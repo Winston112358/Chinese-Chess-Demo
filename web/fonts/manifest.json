@@ -84,8 +84,8 @@
       "characters": "帥仕相馬俥車炮兵將士象砲卒楚河漢界 ",
       "sha256": "a4c55ad5f72e65a482931d967725e97ff206eb3019c87281d9e5514a63bb8db9",
       "license_sha256": "59898fceb37cc662d33b828fa46ac8e9d5dbf0fe6c511ac9172055490ac11b3e",
-      "render_metrics_sha256": "34e2a24f440f89b6d7c16f77c0905c17bd0ecb2ba41211101997a1cf1d2f0689",
-      "render_metrics_module_sha256": "1babc292e29fd09414b356258e5d95b0420bbbe0b2134e20acbe23fe8f1c8a1d"
+      "render_metrics_sha256": "3872f3aca60dec4add1d1cc70096c5217ae0ba955f1784f749b06b47595639ea",
+      "render_metrics_module_sha256": "447d4060b7280c4b0d5907da0cabf9a6f1586b13a0513f6ba78ef365c1ebb067"
     },
     {
       "family": "Xiangqi Clerical Square",
@@ -109,8 +109,8 @@
       "characters": "帥仕相馬車炮兵將士象卒楚河漢界 ",
       "sha256": "f0ba5eda31727ad89cc0b1f6b9a7dfda02f061fa101c18548b6f8ea0145c108b",
       "license_sha256": "3a6f47ee13eba5af69f7b2ce18b58ea971751fbcadd5ab09317768275d774b76",
-      "render_metrics_sha256": "e6e54223ebd29ceab3e512cdd087eb58825b59810cce841d3041f16538bc5e03",
-      "render_metrics_module_sha256": "bbfbabeb893f9ce9cceff7d85a18f468bfe76e9e3e24903995bdd040cdbd28aa",
+      "render_metrics_sha256": "fa6688f618185f48c1c9b156bd610ee741bdfff192068b8f5765602ba8fc0fc3",
+      "render_metrics_module_sha256": "4a3a8ee695a82cc314f6d9085e77c5bd9d39561cf4540d5e798b8206f8eeccf1",
       "license_document_sha256": {
         "CC-BY-ND-3.0-TW.html": "ec166781e97519f0354b44174af61b4594a7fc6e0c57985e5d095beb9796eb05"
       }
