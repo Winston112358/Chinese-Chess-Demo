@@ -10,6 +10,7 @@ import * as notation from '../web/move-notation.js';
 import * as moveRecords from '../web/move-records.js';
 import * as replay from '../src/shared/replay.js';
 import * as roomControls from '../web/room-controls.js';
+import { appFixture } from './helpers/app-fixture.js';
 
 const [appSource, html] = await Promise.all([
   readFile(new URL('../web/app.js', import.meta.url), 'utf8'),
@@ -527,11 +528,11 @@ test('online identity, position, permission and result changes permanently inval
       state(socket, { ...room, game: { ...room.game, history: [{ ...redMove, piece: { side: 'red', type: 'pawn' } }] } });
       state(socket, room);
     }],
-    ['vote', async (_app, socket, room) => {
-      state(socket, { ...room, pendingAction: { id: 'vote', action: 'undo', side: 'black' } }); state(socket, room);
+    ['own vote', async (_app, socket, room) => {
+      state(socket, { ...room, pendingAction: { id: 'vote', action: 'undo', side: 'red' } }); state(socket, room);
     }],
-    ['restart vote', async (_app, socket, room) => {
-      state(socket, { ...room, pendingRestart: { id: 'next-round', action: 'restart', side: 'black' } }); state(socket, room);
+    ['own restart vote', async (_app, socket, room) => {
+      state(socket, { ...room, pendingRestart: { id: 'next-round', action: 'restart', side: 'red' } }); state(socket, room);
     }],
     ['preparing', async (_app, socket, room) => { state(socket, { ...room, phase: 'preparing' }); state(socket, room); }],
     ['timeout result', async (_app, socket, room) => {
@@ -761,16 +762,16 @@ test('a manual online move pending acknowledgement prevents a second submission 
   assert.deepEqual(plain(app.game.history[0].to), otherRedMove.to);
 });
 
-test('starting then rejecting a vote invalidates old analysis without cancelling a newer retry', async (t) => {
+test('an own vote rejected by the opponent invalidates old analysis without cancelling a newer retry', async (t) => {
   const app = await fixture(t);
   const { socket, room } = await app.room();
   app.click('ai-assist');
-  socket.receive({ type: 'state', room: { ...room, pendingAction: { id: 'vote-1', action: 'draw', side: 'black' } } });
+  socket.receive({ type: 'state', room: { ...room, pendingAction: { id: 'vote-1', action: 'draw', side: 'red' } } });
   assert.equal(app.requests[0].options.signal.aborted, true);
   assert.equal(app.element('ai-assist').disabled, true);
-  app.click('decline');
-  assert.equal(socket.sent.at(-1).type, 'action-answer');
-  assert.equal(socket.sent.at(-1).accept, false);
+  assert.equal(app.element('vote-wait').hidden, false);
+  assert.equal(app.element('vote-buttons').hidden, true);
+  // The opponent's rejection arrives as an authoritative state update.
   socket.receive({ type: 'state', room });
   assert.equal(app.element('ai-assist').disabled, false);
   app.click('ai-assist');
@@ -782,7 +783,7 @@ test('starting then rejecting a vote invalidates old analysis without cancelling
   assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), [{ type: 'move', ...otherRedMove, revision: room.revision }]);
 });
 
-test('opponent turn, unstarted clocks, pending votes and disconnects disable online assistance', async (t) => {
+test('opponent turn, unstarted clocks, own pending votes and disconnects disable online assistance', async (t) => {
   const app = await fixture(t);
   const { socket, room } = await app.room({ side: 'black' });
   assert.equal(app.element('ai-assist').disabled, true);
@@ -796,7 +797,7 @@ test('opponent turn, unstarted clocks, pending votes and disconnects disable onl
   socket.receive({ type: 'state', room: { ...ownTurn, clock: { ...ownTurn.clock, started: false } } });
   assert.equal(app.element('ai-assist').disabled, true);
   assert.equal(app.element('ai-suggest').disabled, true);
-  socket.receive({ type: 'state', room: { ...ownTurn, pendingAction: { id: 'vote-1', action: 'undo', side: 'red' } } });
+  socket.receive({ type: 'state', room: { ...ownTurn, pendingAction: { id: 'vote-1', action: 'undo', side: 'black' } } });
   assert.equal(app.element('ai-assist').disabled, true);
   assert.equal(app.element('ai-suggest').disabled, true);
   socket.receive({ type: 'state', room: ownTurn });
@@ -806,6 +807,132 @@ test('opponent turn, unstarted clocks, pending votes and disconnects disable onl
   assert.equal(app.element('ai-suggest').disabled, true);
   await app.reply(0, { move: blackMove });
   assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), []);
+});
+
+const negotiationActions = ['draw', 'undo', 'resign', 'restart'];
+function moverPosition(side) {
+  let game = rules.applyMove(rules.createInitialGame(), redMove.from, redMove.to).game;
+  if (side === 'red') game = rules.applyMove(game, blackMove.from, blackMove.to).game;
+  return { game, move: side === 'red' ? otherRedMove : blackMove };
+}
+function negotiatedRoom(room, action, proposer) {
+  const request = { id: `${proposer}-${action}`, action, side: proposer, revision: room.revision };
+  if (action === 'restart') request.config = { redSide: 'red', timed: false };
+  return { ...room, pendingAction: action === 'restart' ? null : request,
+    pendingRestart: action === 'restart' ? request : null };
+}
+
+test('opponent proposals preserve a selected piece and allow a legal move while stale vote buttons become inert', async (t) => {
+  for (const side of ['red', 'black']) {
+    for (const action of negotiationActions) {
+      await t.test(`${side} receives ${action}`, async (st) => {
+        const app = await appFixture(st);
+        const { game, move } = moverPosition(side);
+        const { socket, room } = await app.room({ side, game });
+        app.clickPoint(move.from);
+        assert.deepEqual(plain(app.selected), move.from);
+        const proposal = negotiatedRoom(room, action, side === 'red' ? 'black' : 'red');
+        socket.receive({ type: 'state', room: proposal });
+        assert.equal(app.canSelect, true);
+        assert.deepEqual(plain(app.selected), move.from, 'An incoming proposal must preserve the selected piece');
+        assert.match(app.element('vote-description').textContent, /可直接合法落子.*自动拒绝/);
+        app.advance(1000);
+        assert.equal(app.element(`time-${side}`).textContent, '09:59', 'The mover clock continues during negotiation');
+        // Click only the destination: reselecting the source would conceal a lost selection.
+        app.clickPoint(move.to);
+        assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), [{ type: 'move', ...move, revision: room.revision }]);
+        assert.deepEqual(plain(app.realGame), game, 'Only the authoritative server can apply the submitted move');
+        assert.equal(app.canSelect, false);
+        for (const id of ['accept', 'decline']) {
+          assert.equal(app.element(id).disabled, true);
+          app.click(id, { force: true });
+        }
+        // An unchanged snapshot while the move is in transit cannot revive the old vote.
+        socket.receive({ type: 'state', room: structuredClone(proposal) });
+        for (const id of ['accept', 'decline']) app.click(id, { force: true });
+        assert.deepEqual(socket.sent.filter(({ type }) => type.endsWith('-answer')), []);
+        const next = rules.applyMove(game, move.from, move.to);
+        assert.equal(next.ok, true);
+        socket.receive({ type: 'state', room: { ...room, revision: room.revision + 1, game: next.game,
+          pendingAction: null, pendingRestart: null, clock: { ...room.clock, runningSide: next.game.turn } } });
+        assert.equal(app.element('vote-popup').hidden, true);
+        for (const id of ['accept', 'decline']) app.click(id, { force: true });
+        assert.deepEqual(socket.sent.filter(({ type }) => type.endsWith('-answer')), [], 'Cleared request handlers cannot submit a late answer');
+        assert.deepEqual(plain(app.realGame), next.game);
+      });
+    }
+  }
+});
+
+test('own proposals lock manual play and prevent both late analysis and cached AI suggestions from submitting moves', async (t) => {
+  for (const side of ['red', 'black']) {
+    for (const action of negotiationActions) {
+      await t.test(`${side} requests ${action}`, async (st) => {
+        const app = await appFixture(st);
+        const { game, move } = moverPosition(side);
+        const { socket, room } = await app.room({ side, game });
+        app.clickPoint(move.from);
+        app.click('ai-suggest');
+        const ownProposal = negotiatedRoom(room, action, side);
+        socket.receive({ type: 'state', room: ownProposal });
+        assert.equal(app.canSelect, false);
+        assert.equal(app.selected, null);
+        assert.equal(app.requests[0].options.signal.aborted, true);
+        for (const id of ['ai-assist', 'ai-suggest']) {
+          assert.equal(app.element(id).disabled, true);
+          app.click(id, { force: true });
+        }
+        app.move(move);
+        await app.reply(0, { move });
+        assert.equal(app.requests.length, 1, 'Own pending negotiation cannot start a replacement analysis');
+        assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), []);
+        assert.deepEqual(plain(app.realGame), game);
+
+        socket.receive({ type: 'state', room });
+        app.click('ai-suggest');
+        await app.reply(1, { move });
+        assert.match(app.element('ai-assist-message').textContent, /建议：/);
+        socket.receive({ type: 'state', room: ownProposal });
+        assert.doesNotMatch(app.element('ai-assist-message').textContent, /建议：/);
+        app.click('ai-assist', { force: true });
+        assert.equal(app.requests.length, 2);
+        assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), [], 'A completed suggestion cannot bypass an own pending request');
+      });
+    }
+  }
+});
+
+test('opponent proposals preserve in-flight thinking, takeovers and completed suggestions for both seats', async (t) => {
+  for (const side of ['red', 'black']) {
+    for (const action of negotiationActions) {
+      for (const mode of ['thinking', 'takeover', 'cached']) {
+        await t.test(`${side} receives ${action} during ${mode}`, async (st) => {
+          const app = await appFixture(st);
+          const { game, move } = moverPosition(side);
+          const { socket, room } = await app.room({ side, game });
+          app.click(mode === 'takeover' ? 'ai-assist' : 'ai-suggest');
+          if (mode === 'cached') await app.reply(0, { move });
+          socket.receive({ type: 'state', room: negotiatedRoom(room, action, side === 'red' ? 'black' : 'red') });
+          assert.equal(app.requests[0].options.signal.aborted, false, 'The opponent cannot cancel a current-position search');
+          assert.equal(app.element('ai-assist').disabled, false);
+          assert.equal(app.element('ai-suggest').disabled, false);
+          if (mode !== 'cached') await app.reply(0, { move });
+          if (mode !== 'takeover') {
+            assert.match(app.element('ai-assist-message').textContent, /建议：/);
+            assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), [], 'Thinking remains advice until explicitly executed');
+            app.click('ai-assist');
+          }
+          assert.equal(app.requests.length, 1, 'The displayed/current analysis must be reused');
+          assert.deepEqual(socket.sent.filter(({ type }) => type === 'move'), [{ type: 'move', ...move, revision: room.revision }]);
+          assert.deepEqual(plain(app.realGame), game);
+          app.click('ai-assist', { force: true });
+          app.click('accept', { force: true });
+          assert.equal(socket.sent.filter(({ type }) => type === 'move').length, 1);
+          assert.deepEqual(socket.sent.filter(({ type }) => type.endsWith('-answer')), []);
+        });
+      }
+    }
+  }
 });
 
 test('an engine failure leaves the board intact and the same action can retry successfully', async (t) => {

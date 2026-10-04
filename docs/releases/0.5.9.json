@@ -1,0 +1,46 @@
+{
+  "version": "0.5.9",
+  "date": "2026-10-04",
+  "platform": "Windows x64",
+  "type": "portable",
+  "path": "dist/Chinese-Chess-Demo-0.5.9-x64.exe",
+  "bytes": 167568678,
+  "sha256": "6ac3da78d84728be0a8630568e1027a50cd2108dcbc82ec2484238e53580d5ee",
+  "changes": [
+    "An opponent's draw, undo, resignation, or restart offer cannot block the recipient's legal move or AI assistance",
+    "A successful recipient move rejects the pending offer; illegal, stale, or expired moves cannot cancel it",
+    "Opponent offers preserve selected pieces and AI analysis; stale vote answers cannot affect an accepted move",
+    "Reverified packaged perpetual-check and perpetual-chase losses for both sides, including rejection of further moves after adjudication",
+    "Includes all 0.5.8 automatic adjudication, canonical notation, replay, sandbox, and reserved endgame features"
+  ],
+  "verification": {
+    "testsPassed": 486,
+    "sourceFilesMatched": 75,
+    "packagedHttpAssetsChecked": 57,
+    "fonts": 6,
+    "textures": 22,
+    "engineModelLicensesAndSourceVerified": true,
+    "nativePortableLaunch": true,
+    "duplicateLaunchPreservesPrimaryEngineAndModel": true,
+    "nativeAiLegalMove": true,
+    "twoLocalWebSocketClientsEndInSameRepetitionDraw": true,
+    "nativeNegotiationAntiStallScenariosPassed": 4,
+    "nativeClockChargesEqualActualElapsedTime": true,
+    "packagedCheckChaseAndColorMirrorCasesPassed": 4,
+    "browserRecipientMoveRejectsOpponentOffer": true,
+    "scope": "Packaged source and local portable EXE verification; two clients ran on this computer, not a physical guest LAN device.",
+    "reports": [
+      "artifacts/anti-stall-v059/test-results.txt",
+      "artifacts/anti-stall-v059/package-verification.json",
+      "artifacts/anti-stall-v059/anti-stall-verification.json",
+      "artifacts/anti-stall-v059/native-http-verification.json",
+      "artifacts/anti-stall-v059/duplicate-verification.json",
+      "artifacts/anti-stall-v059/ui-verification.json"
+    ],
+    "screenshot": "artifacts/anti-stall-v059/anti-vote-after.png"
+  },
+  "previousPortablesPreserved": [
+    "dist/Chinese-Chess-Demo-0.5.8-x64.exe",
+    "dist/ai-lan-v057/Chinese-Chess-Demo-0.5.7-x64.exe"
+  ]
+}

@@ -147,7 +147,9 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
     } else if (message.type === 'move') {
       if (room.game.result) return fail(socket, '本局已结束，请双方同意后重新开局');
       if (room.phase !== 'playing') return fail(socket, '等待双方准备和开局倒数结束后再操作');
-      if (room.pendingAction || room.pendingRestart) return fail(socket, '等待投票回应，请先同意或拒绝请求后再走棋');
+      if (room.pendingAction?.side === side || room.pendingRestart?.side === side) {
+        return fail(socket, '等待投票回应，请先处理自己发起的请求后再走棋');
+      }
       if (room.game.turn !== side) return fail(socket, '还没有轮到你');
       if (message.revision !== room.revision) {
         send(socket, { type: 'state', room: snapshot(room, now()) });
@@ -157,7 +159,11 @@ export function attachRooms(wss, { now = () => performance.now(), clockTickMs = 
       if (!result.ok) return fail(socket, result.error);
       room.game = result.game;
       room.revision++;
+      // An opponent's offer cannot block this player's clock or legal move.
+      // Clear it only after validation succeeds, so bad/stale requests cannot
+      // silently dismiss a vote or make a late answer affect the new position.
       room.pendingAction = null;
+      room.pendingRestart = null;
       if (room.game.result) room.clock.runningSide = null;
       else startClock(room.clock, room.game.turn, at);
     } else if (message.type === 'action-request') {

@@ -201,6 +201,55 @@ test('a delayed tick chooses the first limit; total time keeps its existing time
   }
 });
 
+test('playing through an opposing offer consumes both current budgets and only resets the next turn', async (t) => {
+  const view = await setup(t);
+  await view.start();
+  view.advance(500);
+  view.black.send({ type: 'action-request', action: 'draw', revision: 0 });
+  const offered = await view.both(0, (room) => Boolean(room.pendingAction));
+  assert.equal(offered.clock.moveRemainingMs, 1500);
+  view.advance(500);
+  view.red.send({ type: 'move', revision: 99, ...redPawn });
+  const stale = (await view.red.wait(state(0, (room) => room.clock.moveRemainingMs === 1000))).room;
+  assert.match((await view.red.wait(error)).error, /更新/);
+  assert.deepEqual(stale.pendingAction, offered.pendingAction);
+  assert.equal(stale.clock.moveRemainingMs, 1000);
+  view.advance(499);
+  const played = await move(view, view.red, 0, redPawn);
+  assert.equal(played.pendingAction, null);
+  assert.equal(played.clock.remainingMs.red, 4501);
+  assert.equal(played.clock.remainingMs.black, 9000);
+  assert.equal(played.clock.runningSide, 'black');
+  assert.equal(played.clock.moveRemainingMs, 2000);
+  view.red.send({ type: 'action-answer', requestId: offered.pendingAction.id, accept: true });
+  assert.match((await view.red.wait(error)).error, /失效/);
+  assert.equal(view.red.room.game.history.length, 1);
+});
+
+test('an opposing offer cannot authorize a move at either deadline or conceal the resulting loss', async (t) => {
+  for (const [moveTimeMs, action, expiry, reason] of [[2000, 'restart', 2000, 'move-timeout'], [null, 'draw', 6000, 'timeout']]) {
+    const view = await setup(t, { moveTimeMs });
+    await view.start();
+    view.black.send(action === 'restart'
+      ? { type: 'restart-request', revision: 0 }
+      : { type: 'action-request', action, revision: 0 });
+    const offered = await view.both(0, (room) => Boolean(room.pendingAction || room.pendingRestart));
+    const offer = offered.pendingAction || offered.pendingRestart;
+    view.advance(expiry);
+    view.red.send({ type: 'move', revision: 0, ...redPawn });
+    const ended = await view.both(1, (room) => Boolean(room.game.result));
+    assert.deepEqual(ended.game.result, { winner: 'black', loser: 'red', reason });
+    assert.equal(ended.game.history.length, 0);
+    assert.equal(ended.pendingAction, null);
+    assert.equal(ended.pendingRestart, null);
+    assert.equal(ended.clock.runningSide, null);
+    assert.match((await view.red.wait(error)).error, /结束/);
+    view.red.send({ type: action === 'restart' ? 'restart-answer' : 'action-answer', requestId: offer.id, accept: true });
+    assert.match((await view.red.wait(error)).error, /失效/);
+    assert.deepEqual(view.red.room.game.result, ended.game.result);
+  }
+});
+
 test('refusing a vote preserves elapsed move time; accepting undo starts the restored player without total-time refund', async (t) => {
   const view = await setup(t);
   const { red, black, advance } = view;

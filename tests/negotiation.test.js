@@ -139,18 +139,18 @@ test('refusal keeps the board and does not pause either clock', async (t) => {
   assert.equal(declined.clock.runningSide, 'red');
 });
 
-for (const action of ['undo', 'draw', 'resign']) for (const requesterSide of ['red', 'black']) {
-  test(`${action} vote by ${requesterSide} locks both clients until a valid response, with clocks running`, async (t) => {
+for (const action of ['undo', 'draw', 'resign']) {
+  test(`${action} vote by the current player blocks their own moves until a valid response, with clocks running`, async (t) => {
     const { red, connectBlack, advance } = await setup(t);
     const { black } = await connectBlack();
     const current = await move(red, black, red, 0, [0, 6, 0, 5]);
-    const requester = requesterSide === 'red' ? red : black;
-    const responder = requesterSide === 'red' ? black : red;
+    const requester = black;
+    const responder = red;
     advance(100);
     const old = (await request(red, black, requester, action, 1)).pendingAction;
-    const attemptMove = async (player, from, to, revision = 1) => {
+    const attemptMove = async (player, from, to, revision = 1, expected = /投票|轮到/) => {
       player.send({ type: 'move', from, to, revision });
-      assert.match((await player.wait(error)).error, /投票/);
+      assert.match((await player.wait(error)).error, expected);
     };
     await attemptMove(red, { x: 0, y: 5 }, { x: 0, y: 4 });
     await attemptMove(black, { x: 0, y: 3 }, { x: 0, y: 4 });
@@ -179,13 +179,111 @@ for (const action of ['undo', 'draw', 'resign']) for (const requesterSide of ['r
     assert.notEqual(fresh.id, old.id);
     responder.send({ type: 'action-answer', requestId: old.id, accept: true });
     assert.match((await responder.wait(error)).error, /失效/);
-    await attemptMove(red, { x: 0, y: 5 }, { x: 0, y: 4 }, 2);
+    await attemptMove(red, { x: 0, y: 5 }, { x: 1, y: 5 }, 2, /兵卒/);
+    assert.deepEqual(red.room.pendingAction, fresh, 'An illegal responder move must not discard the offer');
     const released = await answer(red, black, responder, fresh, false, 2);
     assert.deepEqual(released.game, moved.game);
     const resumed = await move(red, black, red, 2, [0, 5, 0, 4]);
     assert.equal(resumed.game.history.length, 3);
   });
 }
+
+for (const action of ['undo', 'draw', 'resign']) {
+  test(`red still waits for the answer to its own ${action} proposal before making a move`, async (t) => {
+    const { red, connectBlack, advance } = await setup(t);
+    const { black } = await connectBlack();
+    await move(red, black, red, 0, [0, 6, 0, 5]);
+    const current = await move(red, black, black, 1, [0, 3, 0, 4]);
+    const pending = (await request(red, black, red, action, 2)).pendingAction;
+    advance(500);
+    red.send({ type: 'move', revision: 2, from: { x: 0, y: 5 }, to: { x: 0, y: 4 } });
+    assert.match((await red.wait(error)).error, /自己发起/);
+    const declined = await answer(red, black, black, pending, false, 2);
+    assert.deepEqual(declined.game, current.game);
+    assert.deepEqual(declined.clock.remainingMs, { red: 5500, black: 9000 });
+    const resumed = await move(red, black, red, 2, [0, 5, 0, 4]);
+    assert.equal(resumed.game.history.length, 3);
+    assert.deepEqual(resumed.clock.remainingMs, declined.clock.remainingMs);
+  });
+}
+
+for (const action of ['undo', 'draw', 'resign', 'restart']) for (const movingSide of ['red', 'black']) {
+  test(`${movingSide} can play through the opponent's ${action} offer; only a valid move cancels it`, async (t) => {
+    const { red, connectBlack, advance } = await setup(t);
+    const { black } = await connectBlack();
+    let current = await move(red, black, red, 0, [0, 6, 0, 5]);
+    if (movingSide === 'red') current = await move(red, black, black, 1, [0, 3, 0, 4]);
+    const revision = current.revision;
+    const mover = movingSide === 'red' ? red : black;
+    const opponent = movingSide === 'red' ? black : red;
+    const requestOffer = async () => {
+      opponent.send(action === 'restart'
+        ? { type: 'restart-request', revision }
+        : { type: 'action-request', action, revision });
+      return broadcast(red, black, revision, (room) => Boolean(room.pendingAction || room.pendingRestart));
+    };
+    advance(100);
+    const offered = await requestOffer();
+    const offer = offered.pendingAction || offered.pendingRestart;
+    assert.equal(offer.side, movingSide === 'red' ? 'black' : 'red');
+    const from = { x: 0, y: movingSide === 'red' ? 5 : 3 };
+    const to = { x: 0, y: 4 };
+    advance(200);
+    mover.send({ type: 'move', revision, from, to: { x: 1, y: from.y } });
+    assert.match((await mover.wait(error)).error, /兵卒/);
+    advance(100);
+    opponent.send({ type: 'move', revision, from: { x: 0, y: 4 }, to: { x: 0, y: 5 } });
+    assert.match((await opponent.wait(error)).error, /投票/);
+    advance(100);
+    mover.send({ type: 'move', revision, from: null, to });
+    assert.match((await mover.wait(error)).error, /位置/);
+    advance(100);
+    mover.send({ type: 'move', revision: revision - 1, from, to });
+    const stale = (await mover.wait(state(revision))).room;
+    assert.match((await mover.wait(error)).error, /更新/);
+    assert.deepEqual(stale.pendingAction || stale.pendingRestart, offer);
+    assert.deepEqual(stale.game, current.game);
+    assert.equal(stale.clock.remainingMs[movingSide], current.clock.remainingMs[movingSide] - 600);
+    advance(100);
+    const played = await move(red, black, mover, revision, [from.x, from.y, to.x, to.y]);
+    assert.equal(played.game.history.length, current.game.history.length + 1);
+    assert.equal(played.pendingAction, null);
+    assert.equal(played.pendingRestart, null);
+    assert.equal(played.game.result, null);
+    assert.equal(played.clock.remainingMs[movingSide], current.clock.remainingMs[movingSide] - 700);
+    mover.send({ type: action === 'restart' ? 'restart-answer' : 'action-answer', requestId: offer.id, accept: true });
+    assert.match((await mover.wait(error)).error, /失效/);
+    assert.deepEqual(mover.room.game, played.game, 'A delayed acceptance cannot undo the adopted move or finish/restart the game');
+  });
+}
+
+test('repeated opposing offers cannot hold the current player hostage until their clock expires', async (t) => {
+  const { red, connectBlack, advance } = await setup(t);
+  const { black } = await connectBlack();
+  await move(red, black, red, 0, [0, 6, 0, 5]);
+  let current = await move(red, black, black, 1, [0, 3, 0, 4]);
+  const redMoves = [[2, 6, 2, 5], [2, 5, 2, 4], [2, 4, 3, 4], [3, 4, 3, 3]];
+  const blackMoves = [[6, 3, 6, 4], [6, 4, 6, 5], [6, 5, 7, 5], [7, 5, 7, 6]];
+  for (const [index, action] of ['draw', 'undo', 'restart', 'resign'].entries()) {
+    black.send(action === 'restart'
+      ? { type: 'restart-request', revision: current.revision }
+      : { type: 'action-request', action, revision: current.revision });
+    const offered = await broadcast(red, black, current.revision, (room) => Boolean(room.pendingAction || room.pendingRestart));
+    const offer = offered.pendingAction || offered.pendingRestart;
+    assert.equal(offer.side, 'black');
+    advance(1000);
+    current = await move(red, black, red, current.revision, redMoves[index]);
+    assert.equal(current.pendingAction, null);
+    assert.equal(current.pendingRestart, null);
+    assert.equal(current.game.result, null);
+    assert.equal(current.clock.remainingMs.red, 6000 - (index + 1) * 1000);
+    red.send({ type: action === 'restart' ? 'restart-answer' : 'action-answer', requestId: offer.id, accept: true });
+    assert.match((await red.wait(error)).error, /失效/);
+    current = await move(red, black, black, current.revision, blackMoves[index]);
+  }
+  assert.equal(current.game.history.length, 10);
+  assert.deepEqual(current.clock.remainingMs, { red: 2000, black: 9000 });
+});
 
 test('single-step undo restores a captured piece, alternates turns and keeps all elapsed time', async (t) => {
   const { red, connectBlack, advance } = await setup(t);

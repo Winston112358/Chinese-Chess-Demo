@@ -230,7 +230,7 @@ test('idle and disconnected players still time out, reconnect preserves the resu
   assert.equal(restarted.clock.runningSide, null);
 });
 
-test('restart voting locks both clients without pausing clocks; refusal restores play and offline clocks still run', async (t) => {
+test('a player awaiting their own restart vote stays blocked without pausing clocks; refusal restores play and offline clocks still run', async (t) => {
   const { server, red, seat, advance } = await timedRoom(t);
   const black = await client(server.port);
   black.send({ type: 'join', code: seat.code });
@@ -244,7 +244,7 @@ test('restart voting locks both clients without pausing clocks; refusal restores
     [red, { x: 0, y: 6 }, { x: 0, y: 5 }], [black, { x: 0, y: 3 }, { x: 0, y: 4 }],
   ]) {
     player.send({ type: 'move', from, to, revision: 0 });
-    assert.match((await player.wait(error)).error, /投票/);
+    assert.match((await player.wait(error)).error, player === red ? /投票/ : /轮到/);
   }
   red.send({ type: 'restart-answer', accept: false });
   assert.match((await red.wait(error)).error, /回应/);
@@ -272,7 +272,7 @@ test('restart voting locks both clients without pausing clocks; refusal restores
     [red, { x: 0, y: 5 }, { x: 0, y: 4 }], [black, { x: 0, y: 3 }, { x: 0, y: 4 }],
   ]) {
     player.send({ type: 'move', from, to, revision: 1 });
-    assert.match((await player.wait(error)).error, /投票/);
+    assert.match((await player.wait(error)).error, player === black ? /投票/ : /轮到/);
   }
   red.send({ type: 'restart-answer', accept: false });
   const secondDecline = (await red.wait(state(1, (room) => !room.pendingRestart))).room;

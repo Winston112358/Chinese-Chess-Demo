@@ -210,6 +210,7 @@ export async function appFixture(t) {
     get roomState() { return bridge.read().room; },
     get sandbox() { return bridge.read().sandbox; },
     get canSelect() { return boardView.canSelect; },
+    get selected() { return boardView.selected; },
     get now() { return elapsed; },
     click(id, { force = false } = {}) {
       const element = typeof id === 'string' ? document.getElementById(id) : id;
@@ -218,6 +219,7 @@ export async function appFixture(t) {
     input(id, value, type = 'change') { const element = document.getElementById(id); element.value = String(value); element.dispatch(type); },
     key(key) { for (const callback of windowListeners.get('keydown') || []) callback({ key, preventDefault() {} }); },
     move(move) { boardView.onClick(move.from); boardView.onClick(move.to); },
+    clickPoint(point) { boardView.onClick(point); },
     advance(ms) {
       const target = elapsed + ms;
       let count = 0;
